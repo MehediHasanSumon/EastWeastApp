@@ -1,4 +1,4 @@
-import { Document, Types } from "mongoose";
+import mongoose, { Document, Types } from "mongoose";
 import { IPermission } from "../../app/models/Permission";
 import { IRole } from "../../app/models/Role";
 
@@ -50,4 +50,36 @@ export interface IEmailVerificationToken extends Document {
   email: string;
   token: number;
   createdAt: Date;
+}
+
+export interface IProduct {
+  name: string;
+  purchases: number;
+  sell: number;
+  description?: string | null;
+  category?: string | null;
+  price: number;
+  stock: number;
+  status: boolean;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+export interface IInvoice {
+  invoice_no: string;
+  date_time: Date;
+  vehicle_no?: string | null;
+  customer_name: string;
+  customer_phone_number: string;
+  payment_method: "cash" | "card" | "bank_transfer" | "credit";
+  product: mongoose.Types.ObjectId;
+  price: number;
+  quantity: number;
+  total_amount: number;
+  discount: number;
+  is_sent_sms: boolean;
+  notes?: string | null;
+  status: "pending" | "paid" | "cancelled";
+  createdAt?: Date;
+  updatedAt?: Date;
 }
