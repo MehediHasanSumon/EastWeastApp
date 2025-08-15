@@ -42,7 +42,6 @@ const userPresenceSchema = new Schema<IUserPresence>(
 );
 
 // Indexes for efficient querying
-userPresenceSchema.index({ userId: 1 });
 userPresenceSchema.index({ isOnline: 1 });
 userPresenceSchema.index({ lastSeen: -1 });
 
