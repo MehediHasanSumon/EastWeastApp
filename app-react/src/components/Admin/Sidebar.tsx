@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { FaRegNewspaper, FaRegUserCircle } from "react-icons/fa";
-import { FiBarChart2, FiCalendar, FiFolder, FiHome, FiMessageCircle } from "react-icons/fi";
+import { FaRegUserCircle } from "react-icons/fa";
+import { FiFolder, FiHome, FiMessageCircle } from "react-icons/fi";
 import type { IconType } from "react-icons/lib";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../interface/types";
@@ -25,7 +25,13 @@ export interface MenuSubItem extends MenuItemBase {
 
 export type MenuItem = MenuLinkItem | MenuSubItem;
 
-const Sidebar = ({ sidebarOpen, setSidebarOpen }: { sidebarOpen: boolean; setSidebarOpen: (value: boolean) => void }) => {
+const Sidebar = ({
+  sidebarOpen,
+  setSidebarOpen,
+}: {
+  sidebarOpen: boolean;
+  setSidebarOpen: (value: boolean) => void;
+}) => {
   const { user } = useSelector((state: RootState) => state.auth);
 
   const hasPermission = (permissionName?: string) => {
@@ -51,14 +57,31 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: { sidebarOpen: boolean; setSid
       label: "User Management",
       icon: FaRegUserCircle,
       children: [
-        { label: "Roles Management", to: "/dashboard/roles", icon: FiFolder, permission: "view-role" },
-        { label: "Permissions Management", to: "/dashboard/permissions", icon: FiFolder, permission: "view-permission" },
-        { label: "User Management", to: "/dashboard/users", icon: FiFolder, permission: "view-user" },
+        {
+          label: "Roles Management",
+          to: "/roles",
+          icon: FiFolder,
+          permission: "view-role",
+        },
+        {
+          label: "Permissions Management",
+          to: "/permissions",
+          icon: FiFolder,
+          permission: "view-permission",
+        },
+        {
+          label: "User Management",
+          to: "/users",
+          icon: FiFolder,
+          permission: "view-user",
+        },
       ],
     },
   ];
 
-  const filteredMenuItems = menuItems.filter((item) => hasPermission(item.permission));
+  const filteredMenuItems = menuItems.filter((item) =>
+    hasPermission(item.permission)
+  );
 
   return (
     <>
@@ -90,7 +113,11 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: { sidebarOpen: boolean; setSid
                   return (
                     <SubMenu key={index} title={item.label} icon={item.icon}>
                       {item.children.map((child, childIndex) => (
-                        <NavItem key={childIndex} to={child.to} icon={child.icon}>
+                        <NavItem
+                          key={childIndex}
+                          to={child.to}
+                          icon={child.icon}
+                        >
                           {child.label}
                         </NavItem>
                       ))}
@@ -98,7 +125,12 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: { sidebarOpen: boolean; setSid
                   );
                 } else {
                   return (
-                    <NavItem key={index} to={item.to} icon={item.icon} badge={item.badge}>
+                    <NavItem
+                      key={index}
+                      to={item.to}
+                      icon={item.icon}
+                      badge={item.badge}
+                    >
                       {item.label}
                     </NavItem>
                   );

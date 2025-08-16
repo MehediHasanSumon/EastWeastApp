@@ -5,7 +5,6 @@ import { BrowserRouter, Route, Routes, useLocation, Navigate } from "react-route
 import { authUser, setUser } from "./app/features/auth/authSlice";
 import type { AppDispatch, RootState } from "./app/Store";
 import ProfileLayout from "./layouts/ProfileLayout";
-import AdminMiddleware from "./middlewares/AdminMiddleware";
 import AuthMiddleware from "./middlewares/AuthMiddleware";
 import GuestMiddleware from "./middlewares/GuestMiddleware";
 import AccountEmailSettings from "./pages/Admin/Account/AccountEmailSettings";
@@ -85,8 +84,8 @@ const AppRoutes = () => {
         <Route path="/confirm-password/:token" element={<ConfirmPasword />} />
       </Route>
 
-      <Route path="/dashboard" element={<AdminMiddleware />}>
-        <Route index element={<Dashboard />} />
+      <Route path="/" element={<AuthMiddleware />}>
+        <Route path="dashboard" element={<Dashboard />} />
 
         {/* User  management*/}
         <Route path="roles" element={<RoleManagement />} />
