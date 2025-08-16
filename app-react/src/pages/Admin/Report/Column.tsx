@@ -28,85 +28,93 @@ interface Invoice {
   total_amount: number;
   discount: number;
   is_sent_sms: boolean;
-  status: "pending" | "paid" | "cancelled";
+  profit?: number;
+  profitMargin?: number;
+  calculatedTotal?: number;
   createdAt: string;
   updatedAt: string;
 }
 
-export const getColumns = (): Column[] => [
+export const getColumns = (): Column<Invoice>[] => [
   {
     header: "Invoice No",
-    accessorKey: "invoice_no",
-    cell: ({ row }: any) => (
-      <span className="font-medium text-gray-900">{row.original.invoice_no}</span>
-    ),
+    accessor: "invoice_no",
+    cell: (row: Invoice) => {
+      if (!row || typeof row !== 'object') return <span className="text-gray-400">N/A</span>;
+      if (!row.invoice_no) return <span className="text-gray-400">N/A</span>;
+      return (
+        <span className="font-medium text-gray-900">{row.invoice_no}</span>
+      );
+    },
   },
   {
     header: "Date",
-    accessorKey: "date_time",
-    cell: ({ row }: any) => (
-      <span className="text-gray-600">
-        {new Date(row.original.date_time).toLocaleDateString()}
-      </span>
-    ),
+    accessor: "date_time",
+    cell: (row: Invoice) => {
+      if (!row || typeof row !== 'object') return <span className="text-gray-400">N/A</span>;
+      if (!row.date_time) return <span className="text-gray-400">N/A</span>;
+      return (
+        <span className="text-gray-600">
+          {new Date(row.date_time).toLocaleDateString()}
+        </span>
+      );
+    },
   },
   {
     header: "Customer",
-    accessorKey: "customer_name",
-    cell: ({ row }: any) => (
-      <div>
-        <div className="font-medium text-gray-900">{row.original.customer_name}</div>
-        <div className="text-sm text-gray-500">{row.original.customer_phone_number}</div>
-      </div>
-    ),
+    accessor: "customer_name",
+    cell: (row: Invoice) => {
+      if (!row) return <span className="text-gray-400">N/A</span>;
+      return (
+        <div>
+          <div className="font-medium text-gray-900">{row.customer_name || 'N/A'}</div>
+          <div className="text-sm text-gray-500">{row.customer_phone_number || 'N/A'}</div>
+        </div>
+      );
+    },
   },
   {
     header: "Product",
-    accessorKey: "product.name",
-    cell: ({ row }: any) => (
-      <span className="text-gray-900">{row.original.product.name}</span>
-    ),
+    accessor: "product.name",
+    cell: (row: Invoice) => {
+      if (!row?.product?.name) return <span className="text-gray-400">N/A</span>;
+      return (
+        <span className="text-gray-900">{row.product.name}</span>
+      );
+    },
   },
   {
     header: "Seller",
-    accessorKey: "seller.name",
-    cell: ({ row }: any) => (
-      <div>
-        <div className="font-medium text-gray-900">{row.original.seller.name}</div>
-        <div className="text-sm text-gray-500">{row.original.seller.email}</div>
-      </div>
-    ),
+    accessor: "seller.name",
+    cell: (row: Invoice) => {
+      if (!row?.seller?.name) return <span className="text-gray-400">N/A</span>;
+      return (
+        <div>
+          <div className="font-medium text-gray-900">{row.seller.name}</div>
+          <div className="text-sm text-gray-500">{row.seller.email}</div>
+        </div>
+      );
+    },
   },
   {
     header: "Amount",
-    accessorKey: "total_amount",
-    cell: ({ row }: any) => (
-      <span className="font-semibold text-green-600">
-        ${row.original.total_amount.toFixed(2)}
-      </span>
-    ),
+    accessor: "total_amount",
+    cell: (row: Invoice) => {
+      if (!row?.total_amount) return <span className="text-gray-400">N/A</span>;
+      return (
+        <span className="font-semibold text-gray-600">
+          ${row.total_amount.toFixed(2)}
+        </span>
+      );
+    },
   },
   {
     header: "Payment",
-    accessorKey: "payment_method",
-    cell: ({ row }: any) => (
-      <span className="capitalize text-gray-700">{row.original.payment_method}</span>
-    ),
-  },
-  {
-    header: "Status",
-    accessorKey: "status",
-    cell: ({ row }: any) => {
-      const status = row.original.status as "pending" | "paid" | "cancelled";
-      const statusColors = {
-        pending: "bg-yellow-100 text-yellow-800",
-        paid: "bg-green-100 text-green-800",
-        cancelled: "bg-red-100 text-red-800",
-      };
+    accessor: "payment_method",
+    cell: (row: Invoice) => {
+      if (!row?.payment_method) return <span className="text-gray-400">N/A</span>;
       return (
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[status]}`}>
-          {status}
-        </span>
+        <span className="capitalize text-gray-700">{row.payment_method}</span>
       );
     },
   },

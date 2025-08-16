@@ -16,22 +16,22 @@ const SettingsSidebar: React.FC = () => {
   const sidebarItems: SidebarItem[] = [
     {
       label: "Profile Information",
-      path: "/dashboard/account-settings",
+      path: "/account-settings",
       icon: <FaRegUserCircle className="w-5 h-5 mr-3" />,
     },
     {
       label: "Email Settings",
-      path: "/dashboard/email-settings",
+      path: "/email-settings",
       icon: <HiOutlineMail className="w-5 h-5 mr-3" />,
     },
     {
       label: "Password",
-      path: "/dashboard/password-settings",
+      path: "/password-settings",
       icon: <MdLockOutline className="w-5 h-5 mr-3" />,
     },
     {
       label: "Appearance",
-      path: "/dashboard/theme-settings",
+      path: "/theme-settings",
       icon: <IoMoonOutline className="w-5 h-5 mr-3" />,
     },
   ];

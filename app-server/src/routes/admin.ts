@@ -36,6 +36,13 @@ import {
   deleteInvoices,
   exportInvoices,
 } from "../app/controllers/Invoice/invoice.controller";
+import {
+  getReportStats,
+  getDetailedReport,
+  exportReport,
+  getProductPerformanceReport,
+  getCustomerAnalysisReport,
+} from "../app/controllers/Admin/report.controller";
 
 const route = Router();
 
@@ -62,5 +69,12 @@ route.post("/create/invoice", createInvoice);
 route.put("/update/invoice/:id", updateInvoice);
 route.post("/delete/invoices", deleteInvoices);
 route.get("/export/invoices", exportInvoices);
+
+// Reports
+route.get("/reports/stats", getReportStats);
+route.get("/reports/detailed", getDetailedReport);
+route.get("/reports/export", exportReport);
+route.get("/reports/product-performance", getProductPerformanceReport);
+route.get("/reports/customer-analysis", getCustomerAnalysisReport);
 
 export default route;

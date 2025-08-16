@@ -10,7 +10,6 @@ import TableHeader from "../../../components/ui/TableHeader";
 import type { PaginationMeta } from "../../../interface/types";
 import AdminLayout from "../../../layouts/Admin/AdminLayout";
 import request from "../../../service/AxiosInstance";
-import { handleApiError } from "../../../utils/Api";
 import { toastError, toastSuccess } from "../../../utils/Toast";
 import { getColumns } from "./Column";
 
@@ -42,7 +41,6 @@ interface Invoice {
   total_amount: number;
   discount: number;
   is_sent_sms: boolean;
-  status: "pending" | "paid" | "cancelled";
   createdAt: string;
   updatedAt: string;
 }
@@ -52,9 +50,6 @@ interface ReportStats {
   totalRevenue: number;
   totalProfit: number;
   averageOrderValue: number;
-  pendingInvoices: number;
-  paidInvoices: number;
-  cancelledInvoices: number;
   topProducts: Array<{
     product: string;
     quantity: number;
@@ -85,7 +80,6 @@ const ReportManagement = () => {
   const [meta, setMeta] = useState<PaginationMeta | null>(null);
   const [stats, setStats] = useState<ReportStats | null>(null);
   const [filters, setFilters] = useState({
-    status: "",
     payment_method: "",
     startDate: "",
     endDate: "",
@@ -142,7 +136,6 @@ const ReportManagement = () => {
         perPage, 
         search: searchInput, 
         sort,
-        status: filters.status || undefined,
         payment_method: filters.payment_method || undefined,
         startDate: filters.startDate || undefined,
         endDate: filters.endDate || undefined,
@@ -158,7 +151,7 @@ const ReportManagement = () => {
       const token = localStorage.getItem('rt') || document.cookie.split('; ').find(row => row.startsWith('rt='))?.split('=')[1];
       console.log('Token available:', !!token);
       
-      const res = await request.get("/api/admin/get/invoices", { params });
+      const res = await request.get("/api/admin/reports/detailed", { params });
       console.log('API response:', res.data);
       
       if (res.data.status && res.data.invoices) {
@@ -194,7 +187,6 @@ const ReportManagement = () => {
       const params = {
         startDate: filters.startDate || undefined,
         endDate: filters.endDate || undefined,
-        status: filters.status || undefined,
         payment_method: filters.payment_method || undefined,
       };
       
@@ -229,7 +221,7 @@ const ReportManagement = () => {
 
   // Separate useEffect for filters to avoid infinite loops
   useEffect(() => {
-    if (filters.startDate || filters.endDate || filters.status || filters.payment_method || filters.customer || filters.minAmount || filters.maxAmount) {
+    if (filters.startDate || filters.endDate || filters.payment_method || filters.customer || filters.minAmount || filters.maxAmount) {
       fetchData();
       fetchStats();
     }
@@ -304,17 +296,16 @@ const ReportManagement = () => {
   const handleExport = async () => {
     setIsExporting(true);
     try {
-      const params = {
-        format: exportFormat,
-        startDate: filters.startDate || undefined,
-        endDate: filters.endDate || undefined,
-        status: filters.status || undefined,
-        payment_method: filters.payment_method || undefined,
-        product: filters.product || undefined,
-        customer: filters.customer || undefined,
-        minAmount: filters.minAmount || undefined,
-        maxAmount: filters.maxAmount || undefined,
-      };
+              const params = {
+          format: exportFormat,
+          startDate: filters.startDate || undefined,
+          endDate: filters.endDate || undefined,
+          payment_method: filters.payment_method || undefined,
+          product: filters.product || undefined,
+          customer: filters.customer || undefined,
+          minAmount: filters.minAmount || undefined,
+          maxAmount: filters.maxAmount || undefined,
+        };
       
       const response = await request.get("/api/admin/reports/export", {
         params,
@@ -432,35 +423,20 @@ const ReportManagement = () => {
       {/* Filter Modal */}
       <Dialog header="Advanced Filter" visible={modals.filter} onHide={() => closeModal("filter")}>
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-              <select
-                value={filters.status}
-                onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:border-blue-500 focus:outline-none"
-              >
-                <option value="">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="paid">Paid</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
-              <select
-                value={filters.payment_method}
-                onChange={(e) => setFilters(prev => ({ ...prev, payment_method: e.target.value }))}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:border-blue-500 focus:outline-none"
-              >
-                <option value="">All Methods</option>
-                <option value="cash">Cash</option>
-                <option value="card">Card</option>
-                <option value="bank_transfer">Bank Transfer</option>
-                <option value="credit">Credit</option>
-                <option value="due">Due</option>
-              </select>
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+            <select
+              value={filters.payment_method}
+              onChange={(e) => setFilters(prev => ({ ...prev, payment_method: e.target.value }))}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:border-blue-500 focus:outline-none"
+            >
+              <option value="">All Methods</option>
+              <option value="cash">Cash</option>
+              <option value="card">Card</option>
+              <option value="bank_transfer">Bank Transfer</option>
+              <option value="credit">Credit</option>
+              <option value="due">Due</option>
+            </select>
           </div>
           
           <div className="grid grid-cols-2 gap-4">
@@ -525,7 +501,6 @@ const ReportManagement = () => {
               variant="light"
               onClick={() => {
                 setFilters({
-                  status: "",
                   payment_method: "",
                   startDate: "",
                   endDate: "",
@@ -630,9 +605,10 @@ const ReportManagement = () => {
         />
 
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
+          {console.log('Table data:', tableData)}
           <Table
             columns={getColumns()}
-            data={tableData}
+            data={tableData || []}
             isLoading={isLoading}
           />
           {meta && <Pagination meta={meta} onPageChange={handlePageChange} />}
