@@ -22,22 +22,20 @@ import {
   updateRole,
 } from "../app/controllers/Admin/role.controller";
 import {
-  createInvoice,
-  deleteInvoices,
-  getAllInvoices,
-  getInvoiceDetails,
-  updateInvoice,
-  updateInvoiceStatus,
-  getReportStats,
-  exportReport,
-} from "../app/controllers/Invoice/invoice.controller";
-import {
   createProduct,
   deleteProducts,
   getAllProducts,
   updateProduct,
   updateProductStatus,
 } from "../app/controllers/Invoice/product.controller";
+import {
+  createInvoice,
+  getAllInvoices,
+  getInvoiceById,
+  updateInvoice,
+  deleteInvoices,
+  exportInvoices,
+} from "../app/controllers/Invoice/invoice.controller";
 
 const route = Router();
 
@@ -59,15 +57,10 @@ route.post("/delete/products", deleteProducts);
 
 // Invoices
 route.get("/get/invoices", getAllInvoices);
-route.get("/get/invoice/:id", getInvoiceDetails);
+route.get("/get/invoice/:id", getInvoiceById);
 route.post("/create/invoice", createInvoice);
 route.put("/update/invoice/:id", updateInvoice);
-route.put("/update/invoice-status/:id", updateInvoiceStatus);
 route.post("/delete/invoices", deleteInvoices);
-
-// Reports
-route.get("/reports/stats", getReportStats);
-route.get("/reports/export", exportReport);
-
+route.get("/export/invoices", exportInvoices);
 
 export default route;

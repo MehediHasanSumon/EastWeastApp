@@ -45,7 +45,6 @@ interface Invoice {
   total_amount: number;
   discount: number;
   is_sent_sms: boolean;
-  status: "pending" | "paid" | "cancelled";
   createdAt: string;
   updatedAt: string;
 }
@@ -57,7 +56,6 @@ const InvoiceManagement = () => {
     delete: false,
     view: false,
     filter: false,
-    statusUpdate: false,
     calculator: false,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -68,12 +66,10 @@ const InvoiceManagement = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [filters, setFilters] = useState({
-    status: "",
     payment_method: "",
     startDate: "",
     endDate: "",
   });
-  const [newStatus, setNewStatus] = useState<"pending" | "paid" | "cancelled">("pending");
   
   // Auto-calculation states
   const [autoCalculate, setAutoCalculate] = useState(true);
@@ -119,7 +115,6 @@ const InvoiceManagement = () => {
         perPage, 
         search: searchInput, 
         sort,
-        status: filters.status || undefined,
         payment_method: filters.payment_method || undefined,
         startDate: filters.startDate || undefined,
         endDate: filters.endDate || undefined,
@@ -160,14 +155,14 @@ const InvoiceManagement = () => {
 
   // Refetch data when modals are closed
   useEffect(() => {
-    if (!modals.createOrEdit && !modals.delete && !modals.statusUpdate) {
+    if (!modals.createOrEdit && !modals.delete) {
       // Small delay to ensure backend operations are complete
       const timer = setTimeout(() => {
         fetchData();
       }, 100);
       return () => clearTimeout(timer);
     }
-  }, [modals.createOrEdit, modals.delete, modals.statusUpdate]);
+  }, [modals.createOrEdit, modals.delete]);
 
   const updateURLParams = (params: Record<string, string | number>) => {
     const newParams = new URLSearchParams(searchParams);
@@ -192,7 +187,7 @@ const InvoiceManagement = () => {
 
   const closeModal = (modalType: keyof typeof modals) => {
     setModals((prev) => ({ ...prev, [modalType]: false }));
-    if (modalType === "createOrEdit" || modalType === "view" || modalType === "delete" || modalType === "statusUpdate" || modalType === "calculator") {
+    if (modalType === "createOrEdit" || modalType === "view" || modalType === "delete" || modalType === "calculator") {
       setSelectedInvoice(null);
       setSelectedProductForCalc(null);
       setFormValues({ price: "", quantity: "", discount: "", total_amount: "" });
@@ -287,7 +282,6 @@ const InvoiceManagement = () => {
         total_amount: parseFloat(values.total_amount),
         discount: parseFloat(values.discount) || 0,
         is_sent_sms: values.is_sent_sms || false,
-        status: values.status,
       };
 
       if (selectedInvoice) {
@@ -342,23 +336,7 @@ const InvoiceManagement = () => {
     openModal("delete");
   };
 
-  const handleStatusUpdate = async () => {
-    if (!selectedInvoice) return;
-    
-    setIsSubmitting(true);
-    try {
-      await request.put(`/api/admin/update/invoice-status/${selectedInvoice._id}`, {
-        status: newStatus,
-      });
-      toastSuccess("Invoice status updated successfully");
-      closeModal("statusUpdate");
-      fetchData();
-    } catch (error) {
-      handleApiError(error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+
 
   const handleExport = async () => {
     try {
@@ -368,10 +346,9 @@ const InvoiceManagement = () => {
           perPage: 10000, // Get all invoices for export
           search: searchInput,
           sort,
-          status: filters.status || undefined,
-          payment_method: filters.payment_method || undefined,
-          startDate: filters.startDate || undefined,
-          endDate: filters.endDate || undefined,
+                  payment_method: filters.payment_method || undefined,
+        startDate: filters.startDate || undefined,
+        endDate: filters.endDate || undefined,
         },
         responseType: 'blob',
       });
@@ -527,20 +504,7 @@ const InvoiceManagement = () => {
       type: "text" as const,
       placeholder: "Enter discount (optional)",
     },
-    {
-      label: "Status",
-      name: "status",
-      type: "select" as const,
-      required: true,
-      options: [
-        { value: "pending", label: "Pending" },
-        { value: "paid", label: "Paid" },
-        { value: "cancelled", label: "Cancelled" },
-      ],
-      validation: {
-        requiredMessage: "Status is required.",
-      },
-    },
+
     {
       label: "Send SMS",
       name: "is_sent_sms",
@@ -573,7 +537,7 @@ const InvoiceManagement = () => {
             quantity: selectedInvoice?.quantity?.toString() || "",
             total_amount: selectedInvoice?.total_amount?.toString() || "",
             discount: selectedInvoice?.discount?.toString() || "0",
-            status: selectedInvoice?.status || "pending",
+
             is_sent_sms: selectedInvoice?.is_sent_sms || false,
           }}
           onSubmit={handleCreateOrEditSubmit}
@@ -618,10 +582,7 @@ const InvoiceManagement = () => {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
                 <p className="mt-1 text-sm text-gray-900 dark:text-gray-100 capitalize">{selectedInvoice.payment_method}</p>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
-                <p className="mt-1 text-sm text-gray-900 dark:text-gray-100 capitalize">{selectedInvoice.status}</p>
-              </div>
+
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Product</label>
@@ -811,46 +772,10 @@ const InvoiceManagement = () => {
         </div>
       </Dialog>
 
-      <Dialog header="Update Invoice Status" visible={modals.statusUpdate} onHide={() => closeModal("statusUpdate")}>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">New Status</label>
-            <select
-              value={newStatus}
-              onChange={(e) => setNewStatus(e.target.value as "pending" | "paid" | "cancelled")}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-            >
-              <option value="pending">Pending</option>
-              <option value="paid">Paid</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </div>
-          <div className="flex justify-end space-x-2">
-            <Button variant="light" onClick={() => closeModal("statusUpdate")}>
-              Cancel
-            </Button>
-            <Button onClick={handleStatusUpdate} disabled={isSubmitting}>
-              {isSubmitting ? "Updating..." : "Update Status"}
-            </Button>
-          </div>
-        </div>
-      </Dialog>
+
 
       <Dialog header="Filter Invoices" visible={modals.filter} onHide={() => closeModal("filter")}>
         <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
-            <select
-              value={filters.status}
-              onChange={(e) => setFilters(prev => ({ ...prev, status: e.target.value }))}
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-blue-500 focus:outline-none focus:ring-blue-500"
-            >
-              <option value="">All Status</option>
-              <option value="pending">Pending</option>
-              <option value="paid">Paid</option>
-              <option value="cancelled">Cancelled</option>
-            </select>
-          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
             <select
@@ -890,7 +815,7 @@ const InvoiceManagement = () => {
             <Button
               variant="light"
               onClick={() => {
-                setFilters({ status: "", payment_method: "", startDate: "", endDate: "" });
+                setFilters({ payment_method: "", startDate: "", endDate: "" });
                 closeModal("filter");
               }}
             >

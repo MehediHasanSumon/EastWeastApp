@@ -32,7 +32,6 @@ interface Invoice {
   total_amount: number;
   discount: number;
   is_sent_sms: boolean;
-  status: "pending" | "paid" | "cancelled";
   createdAt: string;
   updatedAt: string;
 }
@@ -122,23 +121,6 @@ export const getColumns = ({
             : 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300'
         }`}>
           {row.payment_method}
-        </span>
-      </div>
-    ),
-  },
-  {
-    header: "Status",
-    accessor: "status",
-    cell: (row) => (
-      <div className="flex items-center">
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${
-          row.status === 'paid' 
-            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
-            : row.status === 'pending'
-            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
-            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
-        }`}>
-          {row.status}
         </span>
       </div>
     ),

@@ -62,22 +62,21 @@ export interface IProduct {
   updatedAt?: Date;
 }
 
-export interface IInvoice {
+export interface IInvoice extends Document {
   invoice_no: string;
   date_time: Date;
   vehicle_no?: string | null;
   customer_name: string;
   customer_phone_number: string;
   payment_method: "cash" | "card" | "bank_transfer" | "credit" | "due";
-  product: mongoose.Types.ObjectId;
-  seller: mongoose.Types.ObjectId;
+  product: Types.ObjectId | IProduct;
+  seller: Types.ObjectId | IUser;
   price: number;
   quantity: number;
   total_amount: number;
   discount: number;
   is_sent_sms: boolean;
-  notes?: string | null;
-  status: "pending" | "paid" | "cancelled";
   createdAt?: Date;
   updatedAt?: Date;
 }
+

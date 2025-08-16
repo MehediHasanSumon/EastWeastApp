@@ -121,20 +121,7 @@ const InvoiceSchema: Schema<IInvoice> = new Schema(
     is_sent_sms: { 
       type: Boolean, 
       default: false 
-    },
-    notes: {
-      type: String,
-      default: null,
-      trim: true,
-      maxlength: [500, 'Notes cannot exceed 500 characters']
-    },
-    status: { 
-      type: String, 
-      required: true,
-      enum: ["pending", "paid", "cancelled"],
-      default: "pending",
-      index: true
-    },
+    }
   },
   { 
     timestamps: true,
@@ -160,7 +147,6 @@ InvoiceSchema.pre('save', function(next) {
 
 // Indexes for better query performance
 InvoiceSchema.index({ seller: 1, createdAt: -1 });
-InvoiceSchema.index({ seller: 1, status: 1 });
 InvoiceSchema.index({ seller: 1, date_time: -1 });
 InvoiceSchema.index({ seller: 1, customer_name: 1 });
 InvoiceSchema.index({ seller: 1, invoice_no: 1 });
