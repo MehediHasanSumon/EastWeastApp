@@ -69,19 +69,5 @@ route.post("/delete/invoices", deleteInvoices);
 route.get("/reports/stats", getReportStats);
 route.get("/reports/export", exportReport);
 
-// Test endpoint for debugging
-route.get("/test", (req, res) => {
-  const user = (req as any).user;
-  res.json({
-    status: true,
-    message: "Admin route is working",
-    user: user ? {
-      id: user._id || user.id,
-      email: user.email,
-      name: user.name
-    } : null,
-    timestamp: new Date().toISOString()
-  });
-});
 
 export default route;
