@@ -57,9 +57,6 @@ export interface IProduct {
   purchases: number;
   sell: number;
   description?: string | null;
-  category?: string | null;
-  price: number;
-  stock: number;
   status: boolean;
   createdAt?: Date;
   updatedAt?: Date;
@@ -71,8 +68,9 @@ export interface IInvoice {
   vehicle_no?: string | null;
   customer_name: string;
   customer_phone_number: string;
-  payment_method: "cash" | "card" | "bank_transfer" | "credit";
+  payment_method: "cash" | "card" | "bank_transfer" | "credit" | "due";
   product: mongoose.Types.ObjectId;
+  seller: mongoose.Types.ObjectId;
   price: number;
   quantity: number;
   total_amount: number;

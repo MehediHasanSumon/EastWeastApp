@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { FaRegUserCircle } from "react-icons/fa";
-import { FiFolder, FiHome, FiMessageCircle } from "react-icons/fi";
+import { FiBarChart, FiFolder, FiHome, FiMessageCircle } from "react-icons/fi";
 import type { IconType } from "react-icons/lib";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../interface/types";
@@ -52,6 +52,24 @@ const Sidebar = ({
       icon: FiMessageCircle,
       badge: 3,
       permission: "view-messages",
+    },
+    {
+      label: "Invoice Management",
+      to: "/invoices",
+      icon: FiFolder,     
+      // permission: "view-invoice",
+    },
+    {
+      label: "Product Management",
+      to: "/products",
+      icon: FiFolder,     
+      // permission: "view-product",
+    },
+    {
+      label: "Report Management",
+      to: "/reports",
+      icon: FiBarChart,
+      // permission: "view-report",
     },
     {
       label: "User Management",

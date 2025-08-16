@@ -2,14 +2,10 @@
 import { NavigationContainer } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { useEffect, useState } from 'react';
 import './global.css';
 
 // Auth Context
-import { AuthProvider } from './context/AuthContext';
-import { Provider } from 'react-redux';
-import { store, useAppDispatch, useAppSelector } from './store';
-import { hydrateAuth, refreshSession } from './store/authSlice';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import ThemeProvider from './context/ThemeContext';
 
 // Screens
@@ -41,23 +37,11 @@ import { RootStackParamList } from './types/types';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const AppNavigator = () => {
-  const dispatch = useAppDispatch();
-  const { isAuthenticated, hydrated } = useAppSelector((s) => s.auth);
+  const { isAuthenticated, isLoading } = useAuth();
 
-  useEffect(() => {
-    // On mount, hydrate from storage then attempt to refresh access token
-    const init = async () => {
-      await dispatch(hydrateAuth());
-      // Only try refresh after hydration; ignore failures unless 401 handled in slice
-      try {
-        await dispatch(refreshSession());
-      } catch {}
-    };
-    init();
-  }, [dispatch]);
-
-  if (!hydrated) {
-    return null;
+  // Show loading screen while checking authentication
+  if (isLoading) {
+    return null; // You can add a proper loading screen here
   }
 
   return (
@@ -69,7 +53,7 @@ const AppNavigator = () => {
       {!isAuthenticated ? (
         <Stack.Screen name="Login" options={{ headerShown: false }}>
           {(props: NativeStackScreenProps<RootStackParamList, 'Login'>) => (
-            <LoginScreen {...props} onLoginSuccess={() => {}} />
+            <LoginScreen {...props} />
           )}
         </Stack.Screen>
       ) : (
@@ -144,11 +128,9 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <Provider store={store}>
-          <NavigationContainer>
-            <AppNavigator />
-          </NavigationContainer>
-        </Provider>
+        <NavigationContainer>
+          <AppNavigator />
+        </NavigationContainer>
       </AuthProvider>
     </ThemeProvider>
   );

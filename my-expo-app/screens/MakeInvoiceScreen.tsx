@@ -3,12 +3,22 @@ import { Picker } from '@react-native-picker/picker';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
-import { Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, ScrollView, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import InvoicePreview from '../components/InvoicePreview';
 import { RootStackParamList } from '../types/types';
+import api from '../utils/api';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'MakeInvoice'>;
+
+type Product = {
+  _id: string;
+  name: string;
+  purchases: number;
+  sell: number;
+  description?: string;
+  status: boolean;
+};
 
 export default function MakeInvoiceScreen({ navigation }: Props) {
   const [invoiceNo, setInvoiceNo] = useState('');
@@ -18,12 +28,25 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
   const [customerName, setCustomerName] = useState('');
   const [customerMobile, setCustomerMobile] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
-  const [product, setProduct] = useState('');
+  const [selectedProductId, setSelectedProductId] = useState('');
   const [price, setPrice] = useState('');
   const [quantity, setQuantity] = useState('');
   const [discount, setDiscount] = useState('');
-  const [smsNotification, setSmsNotification] = useState('no');
+  const [smsNotification, setSmsNotification] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  
+  // Auto-calculation states
+  const [autoCalculate, setAutoCalculate] = useState(true);
+  const [totalAmount, setTotalAmount] = useState('0.00');
+  const [profitMargin, setProfitMargin] = useState('0.00');
+
+  // Load products on mount
+  useEffect(() => {
+    fetchProducts();
+  }, []);
 
   // Load last invoice number and set next invoice number on mount
   useEffect(() => {
@@ -40,11 +63,56 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
     getInvoiceNumber();
   }, []);
 
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/api/admin/get/products', {
+        params: {
+          page: 1,
+          perPage: 1000,
+          status: 'true', // Only active products
+        },
+      });
+      setProducts(response.data.products);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+      Alert.alert('Error', 'Failed to load products');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const selectedProduct = products.find(p => p._id === selectedProductId);
+
+  // Auto-fill price when product is selected
+  useEffect(() => {
+    if (selectedProduct && autoCalculate) {
+      setPrice(selectedProduct.sell.toString());
+      calculateTotal();
+    }
+  }, [selectedProductId, autoCalculate]);
+
+  // Auto-calculate total when price, quantity, or discount changes
+  useEffect(() => {
+    if (autoCalculate) {
+      calculateTotal();
+    }
+  }, [price, quantity, discount, autoCalculate]);
+
   const calculateTotal = () => {
     const priceNum = parseFloat(price) || 0;
     const quantityNum = parseFloat(quantity) || 0;
     const discountNum = parseFloat(discount) || 0;
-    return (priceNum * quantityNum - discountNum).toFixed(2);
+    const total = (priceNum * quantityNum - discountNum);
+    setTotalAmount(total.toFixed(2));
+    
+    // Calculate profit margin if product is selected
+    if (selectedProduct) {
+      const purchasePrice = selectedProduct.purchases;
+      const profit = (priceNum - purchasePrice) * quantityNum;
+      const profitPercentage = purchasePrice > 0 ? (profit / (purchasePrice * quantityNum)) * 100 : 0;
+      setProfitMargin(profitPercentage.toFixed(2));
+    }
   };
 
   const handleConfirmDate = (date: Date) => {
@@ -53,68 +121,110 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
   };
 
   const handleReset = () => {
-    setInvoiceNo(''); // optional: you can reset to '' or keep current number
+    setInvoiceNo('');
     setDateTime(new Date());
     setVehicleNo('');
     setCustomerName('');
     setCustomerMobile('');
     setPaymentMethod('cash');
-    setProduct('');
+    setSelectedProductId('');
     setPrice('');
     setQuantity('');
     setDiscount('');
-    setSmsNotification('no');
+    setSmsNotification(false);
+    setTotalAmount('0.00');
+    setProfitMargin('0.00');
   };
 
   const validateForm = () => {
-    if (
-      !invoiceNo ||
-      !vehicleNo ||
-      !customerName ||
-      !customerMobile ||
-      !product ||
-      !price ||
-      !quantity
-    ) {
-      Alert.alert('Validation Error', 'Please fill all required fields');
+    if (!invoiceNo) {
+      Alert.alert('Validation Error', 'Invoice number is required');
+      return false;
+    }
+    if (!customerName) {
+      Alert.alert('Validation Error', 'Customer name is required');
+      return false;
+    }
+    if (!customerMobile) {
+      Alert.alert('Validation Error', 'Customer mobile number is required');
+      return false;
+    }
+    if (!selectedProductId) {
+      Alert.alert('Validation Error', 'Please select a product');
+      return false;
+    }
+    if (!price || parseFloat(price) <= 0) {
+      Alert.alert('Validation Error', 'Please enter a valid price');
+      return false;
+    }
+    if (!quantity || parseFloat(quantity) <= 0) {
+      Alert.alert('Validation Error', 'Please enter a valid quantity');
+      return false;
+    }
+    if (parseFloat(discount) < 0) {
+      Alert.alert('Validation Error', 'Discount cannot be negative');
+      return false;
+    }
+    if (parseFloat(discount) > parseFloat(totalAmount)) {
+      Alert.alert('Validation Error', 'Discount cannot be greater than total amount');
       return false;
     }
     return true;
   };
 
   const handleSubmit = async () => {
-    if (validateForm()) {
+    if (!validateForm()) return;
+
+    setSubmitting(true);
+    try {
       const formData = {
-        invoiceNo,
-        dateTime: dateTime.toISOString(),
-        vehicleNo,
-        customerName,
-        customerMobile,
-        paymentMethod,
-        product,
-        price,
-        quantity,
-        discount,
-        smsNotification,
-        totalAmount: calculateTotal(),
+        invoice_no: invoiceNo,
+        date_time: dateTime.toISOString(),
+        vehicle_no: vehicleNo || null,
+        customer_name: customerName,
+        customer_phone_number: customerMobile,
+        payment_method: paymentMethod,
+        product: selectedProductId,
+        price: parseFloat(price),
+        quantity: parseInt(quantity),
+        total_amount: parseFloat(totalAmount),
+        discount: parseFloat(discount) || 0,
+        is_sent_sms: smsNotification,
+        status: 'pending',
       };
 
-      try {
-        // Save current invoiceNo as last used
-        await AsyncStorage.setItem('lastInvoiceNo', invoiceNo);
-      } catch (error) {
-        console.log('Error saving invoice number:', error);
-      }
+      // Save to backend
+      const response = await api.post('/api/admin/create/invoice', formData);
+      
+      // Save current invoiceNo as last used
+      await AsyncStorage.setItem('lastInvoiceNo', invoiceNo);
 
-      console.log('Form Data:', formData);
-      Alert.alert('Success', 'Form submitted successfully!', [
+      Alert.alert('Success', 'Invoice created successfully!', [
         {
           text: 'OK',
           onPress: () => {
-            navigation.navigate('PrintMakeInvoice', formData);
+            navigation.navigate('PrintMakeInvoice', {
+              invoiceNo: invoiceNo,
+              dateTime: dateTime.toISOString(),
+              vehicleNo: vehicleNo || '',
+              customerName: customerName,
+              customerMobile: customerMobile,
+              paymentMethod: paymentMethod,
+              product: selectedProduct?.name || '',
+              price: price,
+              quantity: quantity,
+              discount: discount,
+              smsNotification: smsNotification ? 'yes' : 'no',
+              totalAmount: totalAmount,
+            });
           },
         },
       ]);
+    } catch (error) {
+      console.error('Error creating invoice:', error);
+      Alert.alert('Error', 'Failed to create invoice');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -124,9 +234,15 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
     }
   };
 
+  const handleManualCalculation = () => {
+    setAutoCalculate(!autoCalculate);
+    if (!autoCalculate) {
+      calculateTotal();
+    }
+  };
+
   return (
     <ScrollView className="flex-1 bg-gray-100" contentContainerClassName="p-5 pt-8">
-      <View></View>
       <View className="rounded-2xl bg-white p-8 shadow-lg shadow-black/10">
         <LinearGradient
           colors={['#667eea', '#764ba2']}
@@ -172,13 +288,13 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
         {/* Vehicle No */}
         <View className="mb-5">
           <Text className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-600">
-            Vehicle No *
+            Vehicle No
           </Text>
           <TextInput
             className="rounded-xl border-2 border-gray-300 bg-gray-50 px-4 py-4 text-base"
             value={vehicleNo}
             onChangeText={setVehicleNo}
-            placeholder="Enter Vehicle Number"
+            placeholder="Enter Vehicle Number (optional)"
           />
         </View>
 
@@ -192,7 +308,7 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
               className="rounded-xl border-2 border-gray-300 bg-gray-50 px-4 py-4 text-base"
               value={customerName}
               onChangeText={setCustomerName}
-              placeholder="Enter - Name"
+              placeholder="Enter Customer Name"
             />
           </View>
           <View className="flex-1">
@@ -203,7 +319,7 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
               className="rounded-xl border-2 border-gray-300 bg-gray-50 px-4 py-4 text-base"
               value={customerMobile}
               onChangeText={setCustomerMobile}
-              placeholder="Enter - Number"
+              placeholder="Enter Mobile Number"
               keyboardType="phone-pad"
             />
           </View>
@@ -220,23 +336,57 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
               onValueChange={setPaymentMethod}
               style={{ height: 50 }}>
               <Picker.Item label="Cash" value="cash" />
+              <Picker.Item label="Card" value="card" />
+              <Picker.Item label="Bank Transfer" value="bank_transfer" />
+              <Picker.Item label="Credit" value="credit" />
               <Picker.Item label="Due" value="due" />
-              <Picker.Item label="Poss" value="poss" />
             </Picker>
           </View>
         </View>
 
-        {/* Product */}
+        {/* Product Selection */}
         <View className="mb-5">
           <Text className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-600">
             Product *
           </Text>
-          <TextInput
-            className="rounded-xl border-2 border-gray-300 bg-gray-50 px-4 py-4 text-base"
-            value={product}
-            onChangeText={setProduct}
-            placeholder="Enter Product Name"
-          />
+          {loading ? (
+            <View className="rounded-xl border-2 border-gray-300 bg-gray-50 px-4 py-4">
+              <ActivityIndicator size="small" color="#3B82F6" />
+              <Text className="mt-2 text-center text-gray-500">Loading products...</Text>
+            </View>
+          ) : (
+            <View className="overflow-hidden rounded-xl border-2 border-gray-300 bg-gray-50">
+              <Picker
+                selectedValue={selectedProductId}
+                onValueChange={setSelectedProductId}
+                style={{ height: 50 }}>
+                <Picker.Item label="Select a product" value="" />
+                {products.map((product) => (
+                  <Picker.Item 
+                    key={product._id} 
+                    label={`${product.name} - $${product.sell}`} 
+                    value={product._id} 
+                  />
+                ))}
+              </Picker>
+            </View>
+          )}
+        </View>
+
+        {/* Auto-calculation Toggle */}
+        <View className="mb-5">
+          <TouchableOpacity
+            onPress={handleManualCalculation}
+            className="flex-row items-center">
+            <View
+              className={`h-5 w-5 rounded border-2 border-indigo-600 ${
+                autoCalculate ? 'bg-indigo-600' : 'bg-transparent'
+              }`}
+            />
+            <Text className="ml-2 font-medium text-gray-700">
+              Auto-calculate totals
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Price & Quantity */}
@@ -275,8 +425,9 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
             </Text>
             <TextInput
               className="rounded-xl border-2 border-gray-300 bg-gray-200 px-4 py-4 text-base"
-              value={calculateTotal()}
-              editable={false}
+              value={totalAmount}
+              editable={autoCalculate}
+              onChangeText={autoCalculate ? undefined : setTotalAmount}
             />
           </View>
           <View className="flex-1">
@@ -293,6 +444,20 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
           </View>
         </View>
 
+        {/* Profit Margin Display */}
+        {selectedProduct && (
+          <View className="mb-5">
+            <Text className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-600">
+              Profit Margin
+            </Text>
+            <View className="rounded-xl border-2 border-gray-300 bg-green-50 px-4 py-4">
+              <Text className="text-base font-semibold text-green-700">
+                {profitMargin}% (${((parseFloat(price) || 0) - selectedProduct.purchases) * (parseFloat(quantity) || 0)})
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* SMS Notification */}
         <View className="mb-5">
           <Text className="mb-3 text-sm font-semibold uppercase tracking-wide text-gray-600">
@@ -301,20 +466,20 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
           <View className="flex-row space-x-5">
             <TouchableOpacity
               className="flex-row items-center"
-              onPress={() => setSmsNotification('yes')}>
+              onPress={() => setSmsNotification(true)}>
               <View
                 className={`h-5 w-5 rounded-full border-2 border-indigo-600 ${
-                  smsNotification === 'yes' ? 'bg-indigo-600' : 'bg-transparent'
+                  smsNotification ? 'bg-indigo-600' : 'bg-transparent'
                 }`}
               />
               <Text className="ml-2 font-medium">Yes</Text>
             </TouchableOpacity>
             <TouchableOpacity
               className="ml-5 flex-row items-center"
-              onPress={() => setSmsNotification('no')}>
+              onPress={() => setSmsNotification(false)}>
               <View
                 className={`h-5 w-5 rounded-full border-2 border-indigo-600 ${
-                  smsNotification === 'no' ? 'bg-indigo-600' : 'bg-transparent'
+                  !smsNotification ? 'bg-indigo-600' : 'bg-transparent'
                 }`}
               />
               <Text className="ml-2 font-medium">No</Text>
@@ -342,10 +507,15 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
 
           <TouchableOpacity
             className="flex-1 items-center rounded-xl bg-blue-500 py-3"
-            onPress={handleSubmit}>
-            <Text className="text-xs font-semibold uppercase tracking-wider text-white">
-              Submit
-            </Text>
+            onPress={handleSubmit}
+            disabled={submitting}>
+            {submitting ? (
+              <ActivityIndicator size="small" color="white" />
+            ) : (
+              <Text className="text-xs font-semibold uppercase tracking-wider text-white">
+                Submit
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -371,11 +541,11 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
               customerName={customerName}
               customerMobile={customerMobile}
               paymentMethod={paymentMethod}
-              product={product}
+              product={selectedProduct?.name || ''}
               price={price}
               quantity={quantity}
               discount={discount}
-              smsNotification={smsNotification}
+              smsNotification={smsNotification ? 'yes' : 'no'}
             />
             <TouchableOpacity
               className="mt-10 self-center rounded-2xl bg-indigo-600 px-6 py-3"

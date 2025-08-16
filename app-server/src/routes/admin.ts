@@ -8,6 +8,36 @@ import {
   updateUserStatus,
   updateUserVerification,
 } from "../app/controllers/Admin/users.controller";
+import {
+  createPermission,
+  deletePermissions,
+  getAllPermissions,
+  updatePermission,
+} from "../app/controllers/Admin/permission.controller";
+import {
+  createRole,
+  deleteRoles,
+  getAllRoles,
+  getAllPermissionsForRole,
+  updateRole,
+} from "../app/controllers/Admin/role.controller";
+import {
+  createInvoice,
+  deleteInvoices,
+  getAllInvoices,
+  getInvoiceDetails,
+  updateInvoice,
+  updateInvoiceStatus,
+  getReportStats,
+  exportReport,
+} from "../app/controllers/Invoice/invoice.controller";
+import {
+  createProduct,
+  deleteProducts,
+  getAllProducts,
+  updateProduct,
+  updateProductStatus,
+} from "../app/controllers/Invoice/product.controller";
 
 const route = Router();
 
@@ -19,5 +49,39 @@ route.put("/update/user/:id", updateUser);
 route.put("/update/status/user/:id", updateUserStatus);
 route.put("/update/verified-at/user/:id", updateUserVerification);
 route.post("/delete/users", deleteUsers);
+
+// Products
+route.get("/get/products", getAllProducts);
+route.post("/create/product", createProduct);
+route.put("/update/product/:id", updateProduct);
+route.put("/update/product-status/:id", updateProductStatus);
+route.post("/delete/products", deleteProducts);
+
+// Invoices
+route.get("/get/invoices", getAllInvoices);
+route.get("/get/invoice/:id", getInvoiceDetails);
+route.post("/create/invoice", createInvoice);
+route.put("/update/invoice/:id", updateInvoice);
+route.put("/update/invoice-status/:id", updateInvoiceStatus);
+route.post("/delete/invoices", deleteInvoices);
+
+// Reports
+route.get("/reports/stats", getReportStats);
+route.get("/reports/export", exportReport);
+
+// Test endpoint for debugging
+route.get("/test", (req, res) => {
+  const user = (req as any).user;
+  res.json({
+    status: true,
+    message: "Admin route is working",
+    user: user ? {
+      id: user._id || user.id,
+      email: user.email,
+      name: user.name
+    } : null,
+    timestamp: new Date().toISOString()
+  });
+});
 
 export default route;

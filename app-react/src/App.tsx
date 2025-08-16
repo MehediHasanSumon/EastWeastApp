@@ -12,7 +12,9 @@ import AccountPasswordSettings from "./pages/Admin/Account/AccountPasswordSettin
 import AppearanceSettings from "./pages/Admin/Account/AppearanceSettings";
 import ProfileInformation from "./pages/Admin/Account/ProfileInformation";
 import Dashboard from "./pages/Admin/Dashboard";
+import InvoiceManagement from "./pages/Admin/Invoice/InvoiceManagement";
 import PermissionManagement from "./pages/Admin/Permission/PermissionManagement";
+import ProductManagement from "./pages/Admin/Product/ProductManagement";
 import RoleManagement from "./pages/Admin/Role/RoleManagement";
 import UserManagement from "./pages/Admin/Users/UserManagement";
 import ConfirmPasword from "./pages/Auth/ConfirmPasword";
@@ -33,6 +35,7 @@ import { getOrCreateDeviceId, hexToString } from "./utils/Lib";
 import { getCookie } from "./utils/Storage";
 import GlobalCallManager from "./components/Chat/GlobalCallManager";
 import GlobalMessageNotifier from "./components/Chat/GlobalMessageNotifier";
+import ReportManagement from "./pages/Admin/Report/ReportManagement";
 
 const App = () => {
   return (
@@ -91,6 +94,11 @@ const AppRoutes = () => {
         <Route path="roles" element={<RoleManagement />} />
         <Route path="permissions" element={<PermissionManagement />} />
         <Route path="users" element={<UserManagement />} />
+
+        {/* Product & Invoice management */}
+        <Route path="products" element={<ProductManagement />} />
+        <Route path="invoices" element={<InvoiceManagement />} />
+        <Route path="reports" element={<ReportManagement />} />
 
         <Route path="account-settings" element={<ProfileInformation />} />
         <Route path="email-settings" element={<AccountEmailSettings />} />

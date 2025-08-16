@@ -90,8 +90,27 @@ app.use(cookieParser());
 app.use("/", apiRoutes);
 app.use("/api/", authRoutes);
 app.use("/api/chat/", chatRoutes);
-app.use("/api/admin/", isLoggedIn, roleRoutes);
 app.use("/api/admin/", isLoggedIn, adminRoute);
+app.use("/api/admin/roles/", isLoggedIn, roleRoutes);
+
+// Test endpoint
+app.get("/api/test", (req, res) => {
+  res.json({ 
+    status: true, 
+    message: "Server is running", 
+    timestamp: new Date().toISOString(),
+    userAgent: req.headers['user-agent']
+  });
+});
+
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.json({ 
+    status: "healthy", 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime()
+  });
+});
 
 // Serve uploaded media statically from /uploads
 const UPLOAD_ROOT = process.env.UPLOAD_DIR || path.join(process.cwd(), "uploads");

@@ -15,6 +15,7 @@ const InvoiceSchema: Schema<IInvoice> = new Schema(
       default: "cash"
     },
     product: { type: Schema.Types.ObjectId, ref: "Product", required: true },
+    seller: { type: Schema.Types.ObjectId, ref: "User", required: true },
     price: { type: Number, required: true },
     quantity: { type: Number, required: true },
     total_amount: { type: Number, required: true },

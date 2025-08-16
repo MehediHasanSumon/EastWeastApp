@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { Types } from "mongoose";
 import Invoice from "../../models/Invoice";
 import Product from "../../models/Product";
+import Users from "../../models/Users";
 
 export const createInvoice = async (req: Request, res: Response): Promise<Response | any> => {
   try {
@@ -20,6 +21,15 @@ export const createInvoice = async (req: Request, res: Response): Promise<Respon
       is_sent_sms,
       status
     } = req.body;
+
+    // Get the authenticated user (seller)
+    const seller = (req as any).user?._id || (req as any).user?.id;
+    if (!seller) {
+      return res.status(401).send({
+        status: false,
+        message: "Unauthorized. Please login to create invoice.",
+      });
+    }
 
     // Validate required fields
     if (!invoice_no?.trim()) {
@@ -126,6 +136,7 @@ export const createInvoice = async (req: Request, res: Response): Promise<Respon
       customer_phone_number: customer_phone_number.trim(),
       payment_method,
       product,
+      seller,
       price,
       quantity,
       total_amount,
@@ -137,24 +148,7 @@ export const createInvoice = async (req: Request, res: Response): Promise<Respon
     return res.status(201).send({
       status: true,
       message: "Invoice created successfully.",
-      invoice: {
-        _id: newInvoice._id,
-        invoice_no: newInvoice.invoice_no,
-        date_time: newInvoice.date_time,
-        vehicle_no: newInvoice.vehicle_no,
-        customer_name: newInvoice.customer_name,
-        customer_phone_number: newInvoice.customer_phone_number,
-        payment_method: newInvoice.payment_method,
-        product: newInvoice.product,
-        price: newInvoice.price,
-        quantity: newInvoice.quantity,
-        total_amount: newInvoice.total_amount,
-        discount: newInvoice.discount,
-        is_sent_sms: newInvoice.is_sent_sms,
-        status: newInvoice.status,
-        createdAt: newInvoice.createdAt,
-        updatedAt: newInvoice.updatedAt,
-      },
+      invoice: newInvoice,
     });
   } catch (error) {
     console.error(error);
@@ -167,6 +161,15 @@ export const createInvoice = async (req: Request, res: Response): Promise<Respon
 
 export const getAllInvoices = async (req: Request, res: Response): Promise<Response | any> => {
   try {
+    // Get the authenticated user (seller) - filter by seller
+    const seller = (req as any).user?._id || (req as any).user?.id;
+    if (!seller) {
+      return res.status(401).json({
+        status: false,
+        message: "Unauthorized. Please login to view invoices.",
+      });
+    }
+
     const page = parseInt(req.query.page as string) || 1;
     const perPage = parseInt(req.query.perPage as string) || 10;
     const search = req.query.search as string;
@@ -175,43 +178,93 @@ export const getAllInvoices = async (req: Request, res: Response): Promise<Respo
     const payment_method = req.query.payment_method as string;
     const startDate = req.query.startDate as string;
     const endDate = req.query.endDate as string;
+    const product = req.query.product as string;
+    const customer = req.query.customer as string;
+    const minAmount = req.query.minAmount as string;
+    const maxAmount = req.query.maxAmount as string;
 
-    const query: any = {};
+    // Validate pagination parameters
+    if (page < 1 || perPage < 1 || perPage > 100) {
+      return res.status(400).json({
+        status: false,
+        message: "Invalid pagination parameters. Page must be >= 1, perPage must be between 1 and 100.",
+      });
+    }
 
-    // Search functionality
+    const query: any = { seller };
+
+    // Build search query efficiently
     if (search && search.trim()) {
+      const searchRegex = { $regex: search.trim(), $options: "i" };
       query.$or = [
-        { invoice_no: { $regex: search.trim(), $options: "i" } },
-        { customer_name: { $regex: search.trim(), $options: "i" } },
-        { customer_phone_number: { $regex: search.trim(), $options: "i" } },
-        { vehicle_no: { $regex: search.trim(), $options: "i" } },
+        { invoice_no: searchRegex },
+        { customer_name: searchRegex },
+        { customer_phone_number: searchRegex },
+        { vehicle_no: searchRegex },
       ];
     }
 
-    // Filter by status
+    // Apply filters
     if (status && ["pending", "paid", "cancelled"].includes(status)) {
       query.status = status;
     }
 
-    // Filter by payment method
     if (payment_method && ["cash", "card", "bank_transfer", "credit", "due"].includes(payment_method)) {
       query.payment_method = payment_method;
     }
 
-    // Filter by date range
-    if (startDate || endDate) {
-      query.date_time = {};
-      if (startDate) {
-        query.date_time.$gte = new Date(startDate);
-      }
-      if (endDate) {
-        query.date_time.$lte = new Date(endDate);
+    if (product && Types.ObjectId.isValid(product)) {
+      query.product = product;
+    }
+
+    // Customer filter - merge with search if both exist
+    if (customer && customer.trim()) {
+      const customerRegex = { $regex: customer.trim(), $options: "i" };
+      if (query.$or) {
+        query.$or.push(
+          { customer_name: customerRegex },
+          { customer_phone_number: customerRegex }
+        );
+      } else {
+        query.$or = [
+          { customer_name: customerRegex },
+          { customer_phone_number: customerRegex },
+        ];
       }
     }
 
-    const total = await Invoice.countDocuments(query);
+    // Amount range filter
+    if (minAmount || maxAmount) {
+      query.total_amount = {};
+      if (minAmount && !isNaN(parseFloat(minAmount))) {
+        query.total_amount.$gte = parseFloat(minAmount);
+      }
+      if (maxAmount && !isNaN(parseFloat(maxAmount))) {
+        query.total_amount.$lte = parseFloat(maxAmount);
+      }
+    }
 
-    // Sorting options
+    // Date range filter with proper timezone handling
+    if (startDate || endDate) {
+      query.date_time = {};
+      if (startDate) {
+        const startDateTime = new Date(startDate);
+        startDateTime.setHours(0, 0, 0, 0);
+        query.date_time.$gte = startDateTime;
+      }
+      if (endDate) {
+        const endDateTime = new Date(endDate);
+        endDateTime.setHours(23, 59, 59, 999);
+        query.date_time.$lte = endDateTime;
+      }
+    }
+
+    // Clean up empty $or arrays
+    if (query.$or && query.$or.length === 0) {
+      delete query.$or;
+    }
+
+    // Build sort object
     let sortObj: any = { createdAt: -1 };
     if (sort) {
       switch (sort) {
@@ -244,13 +297,20 @@ export const getAllInvoices = async (req: Request, res: Response): Promise<Respo
       }
     }
 
-    const invoices = await Invoice.find(query)
-      .populate("product", "name")
-      .sort(sortObj)
-      .skip((page - 1) * perPage)
-      .limit(perPage)
-      .lean();
+    // Execute query with proper population and pagination
+    const [invoices, total] = await Promise.all([
+      Invoice.find(query)
+        .populate("product", "name purchases sell")
+        .populate("seller", "name email")
+        .sort(sortObj)
+        .skip((page - 1) * perPage)
+        .limit(perPage)
+        .lean()
+        .exec(),
+      Invoice.countDocuments(query).exec()
+    ]);
 
+    // Calculate pagination metadata
     const lastPage = Math.ceil(total / perPage);
     const from = total > 0 ? (page - 1) * perPage + 1 : 0;
     const to = Math.min((page - 1) * perPage + invoices.length, total);
@@ -269,11 +329,28 @@ export const getAllInvoices = async (req: Request, res: Response): Promise<Respo
         hasPrevPage: page > 1,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error fetching invoices:", error);
+    
+    // Check if it's a database connection error
+    if (error.name === 'MongoNetworkError' || error.name === 'MongoServerSelectionError') {
+      return res.status(503).json({
+        status: false,
+        message: "Database connection error. Please try again later.",
+      });
+    }
+
+    // Check if it's a validation error
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        status: false,
+        message: "Invalid query parameters.",
+      });
+    }
+
     return res.status(500).json({
       status: false,
-      message: "HTTP 500 Internal Server Error",
+      message: "Internal server error. Please try again later.",
     });
   }
 };
@@ -289,7 +366,9 @@ export const getInvoiceDetails = async (req: Request, res: Response): Promise<Re
       });
     }
 
-    const invoice = await Invoice.findById(id).populate("product");
+    const invoice = await Invoice.findById(id)
+      .populate("product", "name purchases sell")
+      .populate("seller", "name email");
 
     if (!invoice) {
       return res.status(404).send({
@@ -414,7 +493,9 @@ export const updateInvoice = async (req: Request, res: Response): Promise<Respon
 
     await invoice.save();
 
-    const updatedInvoice = await Invoice.findById(id).populate("product");
+    const updatedInvoice = await Invoice.findById(id)
+      .populate("product", "name purchases sell")
+      .populate("seller", "name email");
 
     return res.status(200).send({
       status: true,
@@ -453,7 +534,8 @@ export const updateInvoiceStatus = async (req: Request, res: Response): Promise<
       id,
       { status },
       { new: true }
-    ).populate("product");
+    ).populate("product", "name purchases sell")
+     .populate("seller", "name email");
 
     if (!invoice) {
       return res.status(404).json({
@@ -510,4 +592,450 @@ export const deleteInvoices = async (req: Request, res: Response): Promise<Respo
       message: "Internal server error",
     });
   }
+};
+
+// Reports endpoints
+export const getReportStats = async (req: Request, res: Response): Promise<Response | any> => {
+  try {
+    const status = req.query.status as string;
+    const payment_method = req.query.payment_method as string;
+    const startDate = req.query.startDate as string;
+    const endDate = req.query.endDate as string;
+
+    const query: any = {};
+
+    // Get the authenticated user (seller) - filter by seller
+    const seller = (req as any).user?._id || (req as any).user?.id;
+    if (!seller) {
+      return res.status(401).json({
+        status: false,
+        message: "Unauthorized. Please login to view reports.",
+      });
+    }
+
+    // Always filter by seller for security
+    query.seller = seller;
+
+    // Filter by status
+    if (status && ["pending", "paid", "cancelled"].includes(status)) {
+      query.status = status;
+    }
+
+    // Filter by payment method
+    if (payment_method && ["cash", "card", "bank_transfer", "credit", "due"].includes(payment_method)) {
+      query.payment_method = payment_method;
+    }
+
+    // Filter by date range
+    if (startDate || endDate) {
+      query.date_time = {};
+      if (startDate) {
+        const startDateTime = new Date(startDate);
+        startDateTime.setHours(0, 0, 0, 0);
+        query.date_time.$gte = startDateTime;
+      }
+      if (endDate) {
+        const endDateTime = new Date(endDate);
+        endDateTime.setHours(23, 59, 59, 999);
+        query.date_time.$lte = endDateTime;
+      }
+    }
+
+    // Use aggregation pipeline for better performance
+    const aggregationPipeline = [
+      { $match: query },
+      {
+        $lookup: {
+          from: "products",
+          localField: "product",
+          foreignField: "_id",
+          as: "product"
+        }
+      },
+      { $unwind: "$product" },
+      {
+        $group: {
+          _id: null,
+          totalInvoices: { $sum: 1 },
+          totalRevenue: { $sum: "$total_amount" },
+          totalProfit: {
+            $sum: {
+              $multiply: [
+                { $subtract: ["$product.sell", "$product.purchases"] },
+                "$quantity"
+              ]
+            }
+          },
+          pendingInvoices: {
+            $sum: { $cond: [{ $eq: ["$status", "pending"] }, 1, 0] }
+          },
+          paidInvoices: {
+            $sum: { $cond: [{ $eq: ["$status", "paid"] }, 1, 0] }
+          },
+          cancelledInvoices: {
+            $sum: { $cond: [{ $eq: ["$status", "cancelled"] }, 1, 0] }
+          },
+          paymentMethods: {
+            $push: {
+              method: "$payment_method",
+              amount: "$total_amount"
+            }
+          },
+          products: {
+            $push: {
+              product: "$product.name",
+              quantity: "$quantity",
+              revenue: "$total_amount"
+            }
+          }
+        }
+      }
+    ];
+
+    const [statsResult] = await Invoice.aggregate(aggregationPipeline);
+
+    if (!statsResult) {
+      // No data found, return empty stats
+      return res.status(200).json({
+        status: true,
+        totalInvoices: 0,
+        totalRevenue: 0,
+        totalProfit: 0,
+        averageOrderValue: 0,
+        pendingInvoices: 0,
+        paidInvoices: 0,
+        cancelledInvoices: 0,
+        topProducts: [],
+        paymentMethodStats: [],
+        dailyStats: []
+      });
+    }
+
+    const {
+      totalInvoices,
+      totalRevenue,
+      totalProfit,
+      pendingInvoices,
+      paidInvoices,
+      cancelledInvoices,
+      paymentMethods,
+      products
+    } = statsResult;
+
+    const averageOrderValue = totalInvoices > 0 ? totalRevenue / totalInvoices : 0;
+
+    // Process top products
+    const productRevenue = new Map();
+    products.forEach((item: any) => {
+      const current = productRevenue.get(item.product) || { quantity: 0, revenue: 0 };
+      current.quantity += item.quantity;
+      current.revenue += item.revenue;
+      productRevenue.set(item.product, current);
+    });
+
+    const topProducts = Array.from(productRevenue.entries())
+      .map(([product, data]: [string, any]) => ({
+        product,
+        quantity: data.quantity,
+        revenue: data.revenue
+      }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+
+    // Process payment method statistics
+    const paymentMethodStats = new Map();
+    paymentMethods.forEach((item: any) => {
+      const current = paymentMethodStats.get(item.method) || { count: 0, amount: 0 };
+      current.count += 1;
+      current.amount += item.amount;
+      paymentMethodStats.set(item.method, current);
+    });
+
+    const paymentMethodStatsArray = Array.from(paymentMethodStats.entries())
+      .map(([method, data]: [string, any]) => ({
+        method,
+        count: data.count,
+        amount: data.amount
+      }));
+
+    // Generate daily statistics for the last 30 days
+    const dailyStats = [];
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+    for (let i = 0; i < 30; i++) {
+      const date = new Date(thirtyDaysAgo);
+      date.setDate(date.getDate() + i);
+      const dateStr = date.toISOString().split('T')[0];
+      
+      // Get daily stats using aggregation
+      const dailyQuery = { ...query };
+      dailyQuery.date_time = {
+        $gte: new Date(date.setHours(0, 0, 0, 0)),
+        $lte: new Date(date.setHours(23, 59, 59, 999))
+      };
+
+      const dailyAggregation = [
+        { $match: dailyQuery },
+        {
+          $lookup: {
+            from: "products",
+            localField: "product",
+            foreignField: "_id",
+            as: "product"
+          }
+        },
+        { $unwind: "$product" },
+        {
+          $group: {
+            _id: null,
+            invoices: { $sum: 1 },
+            revenue: { $sum: "$total_amount" },
+            profit: {
+              $sum: {
+                $multiply: [
+                  { $subtract: ["$product.sell", "$product.purchases"] },
+                  "$quantity"
+                ]
+              }
+            }
+          }
+        }
+      ];
+
+      const [dailyResult] = await Invoice.aggregate(dailyAggregation);
+      
+      dailyStats.push({
+        date: dateStr,
+        invoices: dailyResult?.invoices || 0,
+        revenue: dailyResult?.revenue || 0,
+        profit: dailyResult?.profit || 0
+      });
+    }
+
+    const result = {
+      status: true,
+      totalInvoices,
+      totalRevenue,
+      totalProfit,
+      averageOrderValue,
+      pendingInvoices,
+      paidInvoices,
+      cancelledInvoices,
+      topProducts,
+      paymentMethodStats: paymentMethodStatsArray,
+      dailyStats
+    };
+
+    return res.status(200).json(result);
+  } catch (error: any) {
+    console.error("Error fetching report stats:", error);
+    
+    // Check if it's a database connection error
+    if (error.name === 'MongoNetworkError' || error.name === 'MongoServerSelectionError') {
+      return res.status(503).json({
+        status: false,
+        message: "Database connection error. Please try again later.",
+      });
+    }
+
+    return res.status(500).json({
+      status: false,
+      message: "Internal server error. Please try again later.",
+    });
+  }
+};
+
+export const exportReport = async (req: Request, res: Response): Promise<Response | any> => {
+  try {
+    const format = req.query.format as string;
+    const status = req.query.status as string;
+    const payment_method = req.query.payment_method as string;
+    const startDate = req.query.startDate as string;
+    const endDate = req.query.endDate as string;
+    const product = req.query.product as string;
+    const customer = req.query.customer as string;
+    const minAmount = req.query.minAmount as string;
+    const maxAmount = req.query.maxAmount as string;
+
+    // Validate export format
+    if (!format || !['pdf', 'excel'].includes(format)) {
+      return res.status(400).json({
+        status: false,
+        message: "Invalid export format. Must be 'pdf' or 'excel'.",
+      });
+    }
+
+    const query: any = {};
+
+    // Get the authenticated user (seller) - filter by seller
+    const seller = (req as any).user?._id || (req as any).user?.id;
+    if (!seller) {
+      return res.status(401).json({
+        status: false,
+        message: "Unauthorized. Please login to export reports.",
+      });
+    }
+
+    // Always filter by seller for security
+    query.seller = seller;
+
+    // Apply filters
+    if (status && ["pending", "paid", "cancelled"].includes(status)) {
+      query.status = status;
+    }
+
+    if (payment_method && ["cash", "card", "bank_transfer", "credit", "due"].includes(payment_method)) {
+      query.payment_method = payment_method;
+    }
+
+    if (product && Types.ObjectId.isValid(product)) {
+      query.product = product;
+    }
+
+    if (customer && customer.trim()) {
+      query.$or = [
+        { customer_name: { $regex: customer.trim(), $options: "i" } },
+        { customer_phone_number: { $regex: customer.trim(), $options: "i" } },
+      ];
+    }
+
+    if (minAmount || maxAmount) {
+      query.total_amount = {};
+      if (minAmount && !isNaN(parseFloat(minAmount))) {
+        query.total_amount.$gte = parseFloat(minAmount);
+      }
+      if (maxAmount && !isNaN(parseFloat(maxAmount))) {
+        query.total_amount.$lte = parseFloat(maxAmount);
+      }
+    }
+
+    if (startDate || endDate) {
+      query.date_time = {};
+      if (startDate) {
+        const startDateTime = new Date(startDate);
+        startDateTime.setHours(0, 0, 0, 0);
+        query.date_time.$gte = startDateTime;
+      }
+      if (endDate) {
+        const endDateTime = new Date(endDate);
+        endDateTime.setHours(23, 59, 59, 999);
+        query.date_time.$lte = endDateTime;
+      }
+    }
+
+    // Use aggregation for better performance
+    const aggregationPipeline: any[] = [
+      { $match: query },
+      {
+        $lookup: {
+          from: "products",
+          localField: "product",
+          foreignField: "_id",
+          as: "product"
+        }
+      },
+      { $unwind: "$product" },
+      {
+        $lookup: {
+          from: "users",
+          localField: "seller",
+          foreignField: "_id",
+          as: "seller"
+        }
+      },
+      { $unwind: "$seller" },
+      {
+        $project: {
+          invoice_no: 1,
+          date_time: 1,
+          customer_name: 1,
+          customer_phone_number: 1,
+          product_name: "$product.name",
+          price: 1,
+          quantity: 1,
+          total_amount: 1,
+          discount: 1,
+          payment_method: 1,
+          status: 1,
+          seller_name: "$seller.name",
+          createdAt: 1
+        }
+      },
+      { $sort: { createdAt: -1 } }
+    ];
+
+    const invoices = await Invoice.aggregate(aggregationPipeline);
+
+    if (format === 'pdf') {
+      // For now, return JSON data. PDF generation can be implemented later
+      return res.status(200).json({
+        status: true,
+        message: "PDF export functionality will be implemented",
+        data: invoices
+      });
+    } else {
+      // Excel format - return CSV data
+      const csvData = generateCSV(invoices);
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=invoice-report-${new Date().toISOString().split('T')[0]}.csv`);
+      return res.status(200).send(csvData);
+    }
+  } catch (error: any) {
+    console.error("Error exporting report:", error);
+    
+    // Check if it's a database connection error
+    if (error.name === 'MongoNetworkError' || error.name === 'MongoServerSelectionError') {
+      return res.status(503).json({
+        status: false,
+        message: "Database connection error. Please try again later.",
+      });
+    }
+
+    return res.status(500).json({
+      status: false,
+      message: "Internal server error. Please try again later.",
+    });
+  }
+};
+
+// Helper function to generate CSV
+const generateCSV = (invoices: any[]): string => {
+  const headers = [
+    'Invoice No',
+    'Date',
+    'Customer Name',
+    'Customer Phone',
+    'Product',
+    'Price',
+    'Quantity',
+    'Total Amount',
+    'Discount',
+    'Payment Method',
+    'Status',
+    'Seller',
+    'Created At'
+  ];
+
+  const rows = invoices.map(invoice => [
+    invoice.invoice_no,
+    new Date(invoice.date_time).toLocaleDateString(),
+    invoice.customer_name,
+    invoice.customer_phone_number,
+    invoice.product_name || '',
+    invoice.price,
+    invoice.quantity,
+    invoice.total_amount,
+    invoice.discount,
+    invoice.payment_method,
+    invoice.status,
+    invoice.seller_name || '',
+    new Date(invoice.createdAt).toLocaleDateString()
+  ]);
+
+  const csvContent = [headers, ...rows]
+    .map(row => row.map(field => `"${field}"`).join(','))
+    .join('\n');
+
+  return csvContent;
 };

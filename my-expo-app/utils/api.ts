@@ -6,8 +6,15 @@ import { getAccessToken, getRefreshToken, getDeviceId, saveTokens, saveUser, cle
 function resolveBaseUrl(): string {
   const env = process.env.EXPO_PUBLIC_BACKEND_HOST || process.env.BACKEND_HOST;
   if (env) return env;
+  
+  // Production fallback
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://your-production-domain.com'; // Update this with your actual production domain
+  }
+  
   // Prefer emulator loopback for Android emulators
   if (Platform.OS === 'android') return 'http://10.0.2.2:8000';
+  
   try {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const Constants = require('expo-constants').default;
@@ -20,6 +27,7 @@ function resolveBaseUrl(): string {
       return `http://${host}:8000`;
     }
   } catch {}
+  
   return 'http://localhost:8000';
 }
 
@@ -28,34 +36,77 @@ export const API_BASE_URL = resolveBaseUrl();
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL.replace(/\/$/, ''),
   withCredentials: true,
-  timeout: 15000,
+  timeout: 30000, // Increased timeout for production
+  headers: {
+    'Accept': 'application/json',
+    'Content-Type': 'application/json',
+  },
 });
 
-// Attach tokens and device id on each request
+// Request interceptor for better error handling
 api.interceptors.request.use(async (config) => {
-  const refreshToken = await getRefreshToken();
-  const accessToken = await getAccessToken();
-  const deviceId = await getDeviceId();
+  try {
+    const refreshToken = await getRefreshToken();
+    const accessToken = await getAccessToken();
+    const deviceId = await getDeviceId();
 
-  if (!config.headers) config.headers = {} as any;
-  (config.headers as any)['Accept'] = 'application/json';
-  if (refreshToken) (config.headers as any)['x-refresh-token'] = refreshToken;
-  if (accessToken) (config.headers as any)['authorization'] = `Bearer ${accessToken}`;
-  if (deviceId) (config.headers as any)['deviceId'] = deviceId;
-  // Ensure no stray trailing slashes in URL
-  if (config.url) config.url = config.url.replace(/^\/+/, '/');
-
-  return config;
+    if (!config.headers) config.headers = {} as any;
+    
+    if (refreshToken) (config.headers as any)['x-refresh-token'] = refreshToken;
+    if (accessToken) (config.headers as any)['authorization'] = `Bearer ${accessToken}`;
+    if (deviceId) (config.headers as any)['deviceId'] = deviceId;
+    
+    // Ensure no stray trailing slashes in URL
+    if (config.url) config.url = config.url.replace(/^\/+/, '/');
+    
+    // Add request timestamp for debugging
+    (config.headers as any)['X-Request-Timestamp'] = new Date().toISOString();
+    
+    return config;
+  } catch (error) {
+    console.error('Request interceptor error:', error);
+    return config;
+  }
+}, (error) => {
+  console.error('Request interceptor error:', error);
+  return Promise.reject(error);
 });
 
-// Handle 401 globally (optional)
+// Response interceptor with better error handling
 api.interceptors.response.use(
-  (res) => res,
-  async (error) => {
-    if (error.response?.status === 401) {
-      // Clear local auth on unauthorized; the app will redirect to login
-      await clearAuth();
+  (res) => {
+    // Log successful responses in development
+    if (__DEV__) {
+      console.log(`✅ API Response [${res.config.method?.toUpperCase()}] ${res.config.url}:`, res.status);
     }
+    return res;
+  },
+  async (error) => {
+    // Log error details
+    if (error.response) {
+      console.error(`❌ API Error [${error.config?.method?.toUpperCase()}] ${error.config?.url}:`, {
+        status: error.response.status,
+        data: error.response.data,
+        headers: error.response.headers,
+      });
+    } else if (error.request) {
+      console.error('❌ API Request Error:', error.request);
+    } else {
+      console.error('❌ API Error:', error.message);
+    }
+
+    // Handle specific error cases
+    if (error.response?.status === 401) {
+      console.log('🔄 Unauthorized, clearing auth...');
+      await clearAuth();
+    } else if (error.response?.status === 503) {
+      console.log('⚠️ Service unavailable, database connection issue');
+    } else if (error.code === 'ECONNABORTED') {
+      console.log('⏰ Request timeout');
+    } else if (error.code === 'NETWORK_ERROR') {
+      console.log('🌐 Network error, check internet connection');
+    }
+
     return Promise.reject(error);
   }
 );
@@ -72,23 +123,38 @@ export type LoginResponse = {
 };
 
 export async function loginApi(values: { email: string; password: string }): Promise<LoginResponse> {
-  const deviceId = await getDeviceId();
-  const res = await api.post<LoginResponse>('/api/login', { ...values, deviceId });
-  return res.data;
+  try {
+    const deviceId = await getDeviceId();
+    const res = await api.post<LoginResponse>('/api/login', { ...values, deviceId });
+    return res.data;
+  } catch (error: any) {
+    console.error('Login API error:', error);
+    throw error;
+  }
 }
 
 export async function refreshAccessToken(): Promise<LoginResponse> {
-  const deviceId = await getDeviceId();
-  const res = await api.post<LoginResponse>(
-    '/api/refresh-token',
-    { deviceId },
-  );
-  return res.data;
+  try {
+    const deviceId = await getDeviceId();
+    const res = await api.post<LoginResponse>(
+      '/api/refresh-token',
+      { deviceId },
+    );
+    return res.data;
+  } catch (error: any) {
+    console.error('Refresh token API error:', error);
+    throw error;
+  }
 }
 
 export async function getMe(): Promise<{ status: boolean; user: any }> {
-  const res = await api.get('/api/me');
-  return res.data;
+  try {
+    const res = await api.get('/api/me');
+    return res.data;
+  } catch (error: any) {
+    console.error('Get me API error:', error);
+    throw error;
+  }
 }
 
 export async function updateMe(payload: {
@@ -100,25 +166,40 @@ export async function updateMe(payload: {
   profession?: string;
   date_of_birth?: string; // ISO string
 }): Promise<{ status: boolean; user: any }> {
-  const res = await api.put('/api/me', payload);
-  return res.data;
+  try {
+    const res = await api.put('/api/me', payload);
+    return res.data;
+  } catch (error: any) {
+    console.error('Update me API error:', error);
+    throw error;
+  }
 }
 
 export async function uploadAvatar(formData: FormData): Promise<{ status: boolean; user: any }> {
-  // Let axios set Content-Type with boundary automatically
-  const res = await api.post('/api/me/avatar', formData);
-  return res.data;
+  try {
+    // Let axios set Content-Type with boundary automatically
+    const res = await api.post('/api/me/avatar', formData);
+    return res.data;
+  } catch (error: any) {
+    console.error('Upload avatar API error:', error);
+    throw error;
+  }
 }
 
 export async function persistFromLogin(data: LoginResponse): Promise<void> {
-  const { token, user } = data;
-  await saveTokens({
-    accessToken: token.accessToken,
-    accessTokenExpiresIn: token.accessTokenExpiresIn,
-    refreshToken: token.refreshToken,
-    refreshTokenExpiresIn: token.refreshTokenExpiresIn,
-  });
-  await saveUser(user);
+  try {
+    const { token, user } = data;
+    await saveTokens({
+      accessToken: token.accessToken,
+      accessTokenExpiresIn: token.accessTokenExpiresIn,
+      refreshToken: token.refreshToken,
+      refreshTokenExpiresIn: token.refreshTokenExpiresIn,
+    });
+    await saveUser(user);
+  } catch (error: any) {
+    console.error('Persist from login error:', error);
+    throw error;
+  }
 }
 
 export default api;
