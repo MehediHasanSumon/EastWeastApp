@@ -2,11 +2,15 @@
 import { NavigationContainer } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { Provider } from 'react-redux';
 import './global.css';
 
 // Auth Context
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ThemeProvider from './context/ThemeContext';
+
+// Store
+import { store } from './store';
 
 // Screens
 import AccountCalculationScreen from './screens/AccountCalculationScreen';
@@ -21,6 +25,7 @@ import EditProfileScreen from './screens/EditProfileScreen';
 import EmployeeScreen from './screens/EmployeeScreen';
 import GroupChatScreen from './screens/GroupChatScreen';
 import ImageViewerScreen from './screens/ImageViewerScreen';
+import InvoiceDetailScreen from './screens/InvoiceDetailScreen';
 import LoginScreen from './screens/LoginScreen';
 import MakeInvoiceScreen from './screens/MakeInvoiceScreen';
 import MessagesScreen from './screens/MessagesScreen';
@@ -107,6 +112,11 @@ const AppNavigator = () => {
             component={PrintMakeInvoiceScreen}
             options={{ title: 'PrintMake Invoice' }}
           />
+          <Stack.Screen
+            name="InvoiceDetail"
+            component={InvoiceDetailScreen}
+            options={{ title: 'Invoice Details' }}
+          />
           <Stack.Screen name="Settings" component={SettingsScreen} />
           <Stack.Screen name="Messages" component={MessagesScreen} />
           <Stack.Screen name="Chat" component={ChatScreen} options={{ headerShown: false }} />
@@ -126,12 +136,14 @@ const AppNavigator = () => {
 
 export default function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <NavigationContainer>
-          <AppNavigator />
-        </NavigationContainer>
-      </AuthProvider>
-    </ThemeProvider>
+    <Provider store={store}>
+      <ThemeProvider>
+        <AuthProvider>
+          <NavigationContainer>
+            <AppNavigator />
+          </NavigationContainer>
+        </AuthProvider>
+      </ThemeProvider>
+    </Provider>
   );
 }

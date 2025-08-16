@@ -99,16 +99,16 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
 
   // Auto-calculate total when price, quantity, or discount changes
   useEffect(() => {
-    if (autoCalculate) {
-      calculateTotal();
-    }
-  }, [price, quantity, discount, autoCalculate]);
+    calculateTotal();
+  }, [price, quantity, discount]);
 
   const calculateTotal = () => {
     const priceNum = parseFloat(price) || 0;
     const quantityNum = parseFloat(quantity) || 0;
     const discountNum = parseFloat(discount) || 0;
-    const total = (priceNum * quantityNum - discountNum);
+    // Ensure the calculation is exactly: (price × quantity) - discount
+    // Use Math.round to avoid floating point precision issues
+    const total = Math.round((priceNum * quantityNum - discountNum) * 100) / 100;
     setTotalAmount(total.toFixed(2));
     
     // Calculate profit margin if product is selected
@@ -141,11 +141,23 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
     setProfitMargin('0.00');
   };
 
+  const cleanPhoneNumber = (phone: string) => {
+    return phone.replace(/[\s\-\(\)]/g, '');
+  };
+
   const validateForm = () => {
     if (!invoiceNo.trim()) {
       Alert.alert('Validation Error', 'Invoice number is required');
       return false;
     }
+    
+    // Validate invoice number format (uppercase letters, numbers, hyphens only)
+    const invoiceRegex = /^[A-Z0-9-]+$/;
+    if (!invoiceRegex.test(invoiceNo.trim())) {
+      Alert.alert('Validation Error', 'Invoice number can only contain uppercase letters, numbers, and hyphens');
+      return false;
+    }
+    
     if (!customerName.trim()) {
       Alert.alert('Validation Error', 'Customer name is required');
       return false;
@@ -154,6 +166,15 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
       Alert.alert('Validation Error', 'Customer mobile number is required');
       return false;
     }
+    
+    // Validate phone number format
+    const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
+    const cleanPhone = cleanPhoneNumber(customerMobile);
+    if (!phoneRegex.test(cleanPhone)) {
+      Alert.alert('Validation Error', 'Please enter a valid phone number (e.g., +1234567890 or 1234567890)');
+      return false;
+    }
+    
     if (!selectedProductId) {
       Alert.alert('Validation Error', 'Please select a product');
       return false;
@@ -170,17 +191,27 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
       Alert.alert('Validation Error', 'Discount cannot be negative');
       return false;
     }
-    if (parseFloat(discount) > parseFloat(totalAmount)) {
-      Alert.alert('Validation Error', 'Discount cannot be greater than total amount');
+    
+    // Validate vehicle number format if provided
+    if (vehicleNo.trim() && !/^[A-Z0-9-]+$/.test(vehicleNo.trim())) {
+      Alert.alert('Validation Error', 'Vehicle number can only contain uppercase letters, numbers, and hyphens');
       return false;
     }
     
-    // Validate total amount calculation
-    const calculatedTotal = (parseFloat(price) * parseFloat(quantity)) - parseFloat(discount || '0');
-    if (Math.abs(calculatedTotal - parseFloat(totalAmount)) > 0.01) {
-      Alert.alert('Validation Error', `Total amount must equal price (${price}) × quantity (${quantity}) - discount (${discount || 0}) = ${calculatedTotal.toFixed(2)}`);
+    // Calculate the correct total amount with precision
+    const priceNum = parseFloat(price);
+    const quantityNum = parseFloat(quantity);
+    const discountNum = parseFloat(discount) || 0;
+    const calculatedTotal = Math.round((priceNum * quantityNum - discountNum) * 100) / 100;
+    
+    // Check if discount is greater than subtotal (before discount)
+    if (discountNum > (priceNum * quantityNum)) {
+      Alert.alert('Validation Error', 'Discount cannot be greater than subtotal amount');
       return false;
     }
+    
+    // Always use the calculated total, not the manually entered one
+    setTotalAmount(calculatedTotal.toFixed(2));
     
     return true;
   };
@@ -188,24 +219,54 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
   const handleSubmit = async () => {
     if (!validateForm()) return;
 
+    // Recalculate total amount to ensure it's correct before submission
+    const priceNum = parseFloat(price) || 0;
+    const quantityNum = parseFloat(quantity) || 0;
+    const discountNum = parseFloat(discount) || 0;
+    // Use Math.round to avoid floating point precision issues
+    const calculatedTotal = Math.round((priceNum * quantityNum - discountNum) * 100) / 100;
+
+    // Log the calculation for debugging
+    console.log('Calculation:', {
+      price: priceNum,
+      quantity: quantityNum,
+      discount: discountNum,
+      subtotal: priceNum * quantityNum,
+      calculatedTotal: calculatedTotal
+    });
+
     setSubmitting(true);
     try {
       const formData = {
-        invoice_no: invoiceNo.trim(),
+        invoice_no: invoiceNo.trim().toUpperCase(),
         date_time: dateTime.toISOString(),
-        vehicle_no: vehicleNo.trim() || null,
+        vehicle_no: vehicleNo.trim() ? vehicleNo.trim().toUpperCase() : null,
         customer_name: customerName.trim(),
-        customer_phone_number: customerMobile.trim(),
+        customer_phone_number: cleanPhoneNumber(customerMobile),
         payment_method: paymentMethod,
         product: selectedProductId,
-        price: parseFloat(price),
-        quantity: parseInt(quantity),
-        total_amount: parseFloat(totalAmount),
-        discount: parseFloat(discount) || 0,
+        price: priceNum,
+        quantity: quantityNum,
+        total_amount: calculatedTotal,
+        discount: discountNum,
         is_sent_sms: smsNotification,
       };
 
       console.log('Submitting invoice data:', formData);
+      console.log('Data types:', {
+        invoice_no: typeof formData.invoice_no,
+        date_time: typeof formData.date_time,
+        vehicle_no: typeof formData.vehicle_no,
+        customer_name: typeof formData.customer_name,
+        customer_phone_number: typeof formData.customer_phone_number,
+        payment_method: typeof formData.payment_method,
+        product: typeof formData.product,
+        price: typeof formData.price,
+        quantity: typeof formData.quantity,
+        total_amount: typeof formData.total_amount,
+        discount: typeof formData.discount,
+        is_sent_sms: typeof formData.is_sent_sms,
+      });
 
       // Save to backend
       const response = await api.post('/api/admin/create/invoice', formData);
@@ -223,14 +284,14 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
                 dateTime: dateTime.toISOString(),
                 vehicleNo: vehicleNo || '',
                 customerName: customerName,
-                customerMobile: customerMobile,
+                customerMobile: cleanPhoneNumber(customerMobile),
                 paymentMethod: paymentMethod,
                 product: selectedProduct?.name || '',
                 price: price,
                 quantity: quantity,
                 discount: discount,
                 smsNotification: smsNotification ? 'yes' : 'no',
-                totalAmount: totalAmount,
+                totalAmount: calculatedTotal.toFixed(2),
               });
             },
           },
@@ -244,6 +305,8 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
       
       if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
+        // Log the full error response for debugging
+        console.error('Full error response:', error.response.data);
       } else if (error.message) {
         errorMessage = error.message;
       }
@@ -261,10 +324,8 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
   };
 
   const handleManualCalculation = () => {
-    setAutoCalculate(!autoCalculate);
-    if (!autoCalculate) {
-      calculateTotal();
-    }
+    // Always auto-calculate for consistency
+    calculateTotal();
   };
 
   return (
@@ -288,9 +349,13 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
             className="rounded-xl border-2 border-gray-300 bg-gray-50 px-4 py-4 text-base"
             value={invoiceNo}
             onChangeText={setInvoiceNo}
-            placeholder="Enter Invoice Number"
+            placeholder="e.g., INV-001 or 001"
             keyboardType="numeric"
+            autoCapitalize="characters"
           />
+          <Text className="mt-1 text-xs text-gray-500">
+            Use uppercase letters, numbers, and hyphens only
+          </Text>
         </View>
 
         {/* Date */}
@@ -320,8 +385,12 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
             className="rounded-xl border-2 border-gray-300 bg-gray-50 px-4 py-4 text-base"
             value={vehicleNo}
             onChangeText={setVehicleNo}
-            placeholder="Enter Vehicle Number (optional)"
+            placeholder="e.g., ABC-123 or leave empty"
+            autoCapitalize="characters"
           />
+          <Text className="mt-1 text-xs text-gray-500">
+            Use uppercase letters, numbers, and hyphens only (optional)
+          </Text>
         </View>
 
         {/* Customer Name & Mobile */}
@@ -345,9 +414,12 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
               className="rounded-xl border-2 border-gray-300 bg-gray-50 px-4 py-4 text-base"
               value={customerMobile}
               onChangeText={setCustomerMobile}
-              placeholder="Enter Mobile Number"
+              placeholder="e.g., +1234567890 or 1234567890"
               keyboardType="phone-pad"
             />
+            <Text className="mt-1 text-xs text-gray-500">
+              Enter numbers only, optionally starting with +
+            </Text>
           </View>
         </View>
 
@@ -452,8 +524,8 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
             <TextInput
               className="rounded-xl border-2 border-gray-300 bg-gray-200 px-4 py-4 text-base"
               value={totalAmount}
-              editable={!autoCalculate}
-              onChangeText={autoCalculate ? undefined : setTotalAmount}
+              editable={false}
+              onChangeText={undefined}
             />
           </View>
           <View className="flex-1">
