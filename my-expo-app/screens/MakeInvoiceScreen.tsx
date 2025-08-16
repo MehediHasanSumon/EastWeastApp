@@ -73,10 +73,15 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
           status: 'true', // Only active products
         },
       });
-      setProducts(response.data.products);
+      
+      if (response.data.status && response.data.products) {
+        setProducts(response.data.products);
+      } else {
+        throw new Error('Invalid response structure');
+      }
     } catch (error) {
       console.error('Error fetching products:', error);
-      Alert.alert('Error', 'Failed to load products');
+      Alert.alert('Error', 'Failed to load products. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -137,15 +142,15 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
   };
 
   const validateForm = () => {
-    if (!invoiceNo) {
+    if (!invoiceNo.trim()) {
       Alert.alert('Validation Error', 'Invoice number is required');
       return false;
     }
-    if (!customerName) {
+    if (!customerName.trim()) {
       Alert.alert('Validation Error', 'Customer name is required');
       return false;
     }
-    if (!customerMobile) {
+    if (!customerMobile.trim()) {
       Alert.alert('Validation Error', 'Customer mobile number is required');
       return false;
     }
@@ -169,6 +174,14 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
       Alert.alert('Validation Error', 'Discount cannot be greater than total amount');
       return false;
     }
+    
+    // Validate total amount calculation
+    const calculatedTotal = (parseFloat(price) * parseFloat(quantity)) - parseFloat(discount || '0');
+    if (Math.abs(calculatedTotal - parseFloat(totalAmount)) > 0.01) {
+      Alert.alert('Validation Error', `Total amount must equal price (${price}) × quantity (${quantity}) - discount (${discount || 0}) = ${calculatedTotal.toFixed(2)}`);
+      return false;
+    }
+    
     return true;
   };
 
@@ -178,11 +191,11 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
     setSubmitting(true);
     try {
       const formData = {
-        invoice_no: invoiceNo,
+        invoice_no: invoiceNo.trim(),
         date_time: dateTime.toISOString(),
-        vehicle_no: vehicleNo || null,
-        customer_name: customerName,
-        customer_phone_number: customerMobile,
+        vehicle_no: vehicleNo.trim() || null,
+        customer_name: customerName.trim(),
+        customer_phone_number: customerMobile.trim(),
         payment_method: paymentMethod,
         product: selectedProductId,
         price: parseFloat(price),
@@ -190,39 +203,52 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
         total_amount: parseFloat(totalAmount),
         discount: parseFloat(discount) || 0,
         is_sent_sms: smsNotification,
-        status: 'pending',
       };
+
+      console.log('Submitting invoice data:', formData);
 
       // Save to backend
       const response = await api.post('/api/admin/create/invoice', formData);
       
-      // Save current invoiceNo as last used
-      await AsyncStorage.setItem('lastInvoiceNo', invoiceNo);
+      if (response.data.status) {
+        // Save current invoiceNo as last used
+        await AsyncStorage.setItem('lastInvoiceNo', invoiceNo);
 
-      Alert.alert('Success', 'Invoice created successfully!', [
-        {
-          text: 'OK',
-          onPress: () => {
-            navigation.navigate('PrintMakeInvoice', {
-              invoiceNo: invoiceNo,
-              dateTime: dateTime.toISOString(),
-              vehicleNo: vehicleNo || '',
-              customerName: customerName,
-              customerMobile: customerMobile,
-              paymentMethod: paymentMethod,
-              product: selectedProduct?.name || '',
-              price: price,
-              quantity: quantity,
-              discount: discount,
-              smsNotification: smsNotification ? 'yes' : 'no',
-              totalAmount: totalAmount,
-            });
+        Alert.alert('Success', 'Invoice created successfully!', [
+          {
+            text: 'OK',
+            onPress: () => {
+              navigation.navigate('PrintMakeInvoice', {
+                invoiceNo: invoiceNo,
+                dateTime: dateTime.toISOString(),
+                vehicleNo: vehicleNo || '',
+                customerName: customerName,
+                customerMobile: customerMobile,
+                paymentMethod: paymentMethod,
+                product: selectedProduct?.name || '',
+                price: price,
+                quantity: quantity,
+                discount: discount,
+                smsNotification: smsNotification ? 'yes' : 'no',
+                totalAmount: totalAmount,
+              });
+            },
           },
-        },
-      ]);
-    } catch (error) {
+        ]);
+      } else {
+        throw new Error(response.data.message || 'Failed to create invoice');
+      }
+    } catch (error: any) {
       console.error('Error creating invoice:', error);
-      Alert.alert('Error', 'Failed to create invoice');
+      let errorMessage = 'Failed to create invoice';
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Error', errorMessage);
     } finally {
       setSubmitting(false);
     }
@@ -426,7 +452,7 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
             <TextInput
               className="rounded-xl border-2 border-gray-300 bg-gray-200 px-4 py-4 text-base"
               value={totalAmount}
-              editable={autoCalculate}
+              editable={!autoCalculate}
               onChangeText={autoCalculate ? undefined : setTotalAmount}
             />
           </View>

@@ -46,7 +46,9 @@ type Invoice = {
   total_amount: number;
   discount: number;
   is_sent_sms: boolean;
-  status: "pending" | "paid" | "cancelled";
+  profit?: number;
+  profitMargin?: number;
+  calculatedTotal?: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -56,9 +58,6 @@ type ReportStats = {
   totalRevenue: number;
   totalProfit: number;
   averageOrderValue: number;
-  pendingInvoices: number;
-  paidInvoices: number;
-  cancelledInvoices: number;
   topProducts: Array<{
     product: string;
     quantity: number;
@@ -92,7 +91,6 @@ export default function ReportScreen() {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [exportModalVisible, setExportModalVisible] = useState(false);
   const [filters, setFilters] = useState({
-    status: '',
     payment_method: '',
     startDate: '',
     endDate: '',
@@ -119,7 +117,6 @@ export default function ReportScreen() {
         page: pageNum,
         perPage: 20,
         search: search,
-        status: filters.status || undefined,
         payment_method: filters.payment_method || undefined,
         startDate: filters.startDate || undefined,
         endDate: filters.endDate || undefined,
@@ -128,7 +125,7 @@ export default function ReportScreen() {
         maxAmount: filters.maxAmount || undefined,
       };
       
-      const response = await api.get('/api/admin/get/invoices', { params });
+      const response = await api.get('/api/admin/reports/detailed', { params });
       const { invoices: newInvoices, meta } = response.data;
       
       if (refresh || pageNum === 1) {
@@ -153,7 +150,6 @@ export default function ReportScreen() {
       const params = {
         startDate: filters.startDate || undefined,
         endDate: filters.endDate || undefined,
-        status: filters.status || undefined,
         payment_method: filters.payment_method || undefined,
       };
       const response = await api.get('/api/admin/reports/stats', { params });
@@ -204,16 +200,15 @@ export default function ReportScreen() {
   const handleExport = async () => {
     setExporting(true);
     try {
-      const params = {
-        format: exportFormat,
-        startDate: filters.startDate || undefined,
-        endDate: filters.endDate || undefined,
-        status: filters.status || undefined,
-        payment_method: filters.payment_method || undefined,
-        customer: filters.customer || undefined,
-        minAmount: filters.minAmount || undefined,
-        maxAmount: filters.maxAmount || undefined,
-      };
+              const params = {
+          format: exportFormat,
+          startDate: filters.startDate || undefined,
+          endDate: filters.endDate || undefined,
+          payment_method: filters.payment_method || undefined,
+          customer: filters.customer || undefined,
+          minAmount: filters.minAmount || undefined,
+          maxAmount: filters.maxAmount || undefined,
+        };
       
       console.log('Exporting with params:', params);
       
@@ -287,7 +282,6 @@ export default function ReportScreen() {
 
   const clearFilters = () => {
     setFilters({
-      status: '',
       payment_method: '',
       startDate: '',
       endDate: '',
@@ -313,17 +307,13 @@ export default function ReportScreen() {
         <View className="items-end">
           <Text className="font-bold text-green-600">${item.total_amount.toFixed(2)}</Text>
           <Text className="text-xs text-gray-500 capitalize">{item.payment_method}</Text>
-          <View className={`mt-1 px-2 py-1 rounded-full ${
-            item.status === 'paid' ? 'bg-green-100' : 
-            item.status === 'pending' ? 'bg-yellow-100' : 'bg-red-100'
-          }`}>
-            <Text className={`text-xs font-medium ${
-              item.status === 'paid' ? 'text-green-800' : 
-              item.status === 'pending' ? 'text-yellow-800' : 'text-red-800'
-            }`}>
-              {item.status}
-            </Text>
-          </View>
+          {item.profit !== undefined && (
+            <View className="mt-1 px-2 py-1 rounded-full bg-blue-100">
+              <Text className="text-xs font-medium text-blue-800">
+                Profit: ${item.profit.toFixed(2)}
+              </Text>
+            </View>
+          )}
         </View>
       </View>
       <View className="mt-2 flex-row justify-between">
@@ -475,26 +465,6 @@ export default function ReportScreen() {
           
           <ScrollView className="flex-1">
             <View className="space-y-4">
-              <View>
-                <Text className="text-sm font-medium text-gray-700 mb-1">Status</Text>
-                <View className="flex-row space-x-2">
-                  {(['pending', 'paid', 'cancelled'] as const).map((status) => (
-                    <TouchableOpacity
-                      key={status}
-                      onPress={() => setFilters(prev => ({ ...prev, status: prev.status === status ? '' : status }))}
-                      className={`px-3 py-2 rounded-full ${
-                        filters.status === status ? 'bg-blue-500' : 'bg-gray-200'
-                      }`}>
-                      <Text className={`text-sm font-medium ${
-                        filters.status === status ? 'text-white' : 'text-gray-700'
-                      }`}>
-                        {status}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-              
               <View>
                 <Text className="text-sm font-medium text-gray-700 mb-1">Payment Method</Text>
                 <View className="flex-row flex-wrap gap-2">
