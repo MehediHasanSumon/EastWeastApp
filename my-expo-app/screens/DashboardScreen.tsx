@@ -25,7 +25,7 @@ const dashboardItems: DashboardItem[] = [
   { title: 'Employee', route: 'Employee', icon: require('../assets/employee.png') },
   { title: 'Make Invoice', route: 'MakeInvoice', icon: require('../assets/invoice.png') },
   { title: 'General Settings', route: 'Settings', icon: require('../assets/settings.png') },
-  { title: 'Messages', route: 'Messages', icon: require('../assets/convartion.png') },
+  { title: 'Messages', route: 'ConversationList', icon: require('../assets/convartion.png') },
 ];
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Dashboard'>;

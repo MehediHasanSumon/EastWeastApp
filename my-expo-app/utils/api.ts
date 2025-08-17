@@ -1,14 +1,18 @@
 import axios, { AxiosInstance } from 'axios';
 import { Platform } from 'react-native';
 import { getAccessToken, getRefreshToken, getDeviceId, saveTokens, saveUser, clearAuth } from './authStorage';
+import Constants from 'expo-constants';
 
 // Configure your backend host via env or fallback suitable for real devices/emulators
 function resolveBaseUrl(): string {
-  const env = process.env.EXPO_PUBLIC_BACKEND_HOST || process.env.BACKEND_HOST;
-  if (env) return env;
+  // Try to get from app config first (for production builds)
+  const appConfig = Constants.expoConfig?.extra;
+  const envBackendHost = appConfig?.EXPO_PUBLIC_BACKEND_HOST || process.env.EXPO_PUBLIC_BACKEND_HOST || process.env.BACKEND_HOST;
+  
+  if (envBackendHost) return envBackendHost;
   
   // Production fallback
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.NODE_ENV === 'production' || appConfig?.NODE_ENV === 'production') {
     return 'https://your-production-domain.com'; // Update this with your actual production domain
   }
   
