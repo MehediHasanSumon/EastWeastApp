@@ -19,8 +19,13 @@ const initialState: AuthState = {
 };
 
 export const hydrateAuth = createAsyncThunk('auth/hydrate', async () => {
-  const [user, tokens] = await Promise.all([loadUser(), loadTokens()]);
-  return { user, tokens } as const;
+  try {
+    const [user, tokens] = await Promise.all([loadUser(), loadTokens()]);
+    return { user, tokens } as const;
+  } catch (error) {
+    console.error('Hydration error:', error);
+    return { user: null, tokens: null } as const;
+  }
 });
 
 export const login = createAsyncThunk(

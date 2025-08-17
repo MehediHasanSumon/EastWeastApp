@@ -15,14 +15,12 @@ import { useAppDispatch, useAppSelector } from '../store';
 import { login } from '../store/authSlice';
 import { RootStackParamList } from '../types/types';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Login'> & {
-  onLoginSuccess: () => void;
-};
+type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
 const DUMMY_EMAIL = '';
 const DUMMY_PASSWORD = '';
 
-export default function LoginScreen({ onLoginSuccess }: Props) {
+export default function LoginScreen({}: Props) {
   const { theme } = useContext(ThemeContext);
   const dispatch = useAppDispatch();
   const { isLoading, error, isAuthenticated } = useAppSelector((s) => s.auth);
@@ -31,16 +29,89 @@ export default function LoginScreen({ onLoginSuccess }: Props) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [resetEmail, setResetEmail] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [resetEmailError, setResetEmailError] = useState('');
+
+  const validateEmail = (email: string): boolean => {
+    const trimmedEmail = email.trim();
+    
+    // Check if email is empty or just whitespace
+    if (!trimmedEmail) {
+      return false;
+    }
+    
+    // Check if email contains @ symbol
+    if (!trimmedEmail.includes('@')) {
+      return false;
+    }
+    
+    // Check if email has domain part
+    const parts = trimmedEmail.split('@');
+    if (parts.length !== 2 || !parts[1] || !parts[1].includes('.')) {
+      return false;
+    }
+    
+    // Use the same regex as backend
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(trimmedEmail);
+  };
+
+  const handleEmailChange = (text: string) => {
+    const trimmedText = text.trim();
+    setEmail(trimmedText);
+    
+    // Clear error if user is typing
+    if (emailError) {
+      setEmailError('');
+    }
+    
+    // Show validation error if user has typed something but it's invalid
+    if (trimmedText && !validateEmail(trimmedText)) {
+      setEmailError('Please enter a valid email address');
+    }
+  };
+
+  const handleResetEmailChange = (text: string) => {
+    const trimmedText = text.trim();
+    setResetEmail(trimmedText);
+    
+    // Clear error if user is typing
+    if (resetEmailError) {
+      setResetEmailError('');
+    }
+    
+    // Show validation error if user has typed something but it's invalid
+    if (trimmedText && !validateEmail(trimmedText)) {
+      setResetEmailError('Please enter a valid email address');
+    }
+  };
+
+
 
   const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
+    const trimmedEmail = email.trim();
+    const trimmedPassword = password.trim();
+    
+    // Clear previous errors
+    setEmailError('');
+    
+    if (!trimmedEmail || !trimmedPassword) {
       Alert.alert('Error', 'Please enter email and password');
       return;
     }
-    const result = await dispatch(login({ email, password }));
+
+    // Email validation
+    if (!validateEmail(trimmedEmail)) {
+      setEmailError('Please enter a valid email address');
+      return;
+    }
+
+    // Additional safety check - ensure email is properly formatted
+    const cleanEmail = trimmedEmail.toLowerCase().replace(/\s+/g, '');
+
+    const result = await dispatch(login({ email: cleanEmail, password: trimmedPassword }));
     if ((result as any).meta.requestStatus === 'fulfilled') {
       Alert.alert('Success', 'Login Successful!');
-      onLoginSuccess();
     } else if (typeof (result as any).payload === 'string') {
       Alert.alert('Login Failed', (result as any).payload);
     } else {
@@ -49,11 +120,23 @@ export default function LoginScreen({ onLoginSuccess }: Props) {
   };
 
   const handleSendResetLink = () => {
-    if (!resetEmail.trim()) {
+    const trimmedResetEmail = resetEmail.trim();
+    
+    // Clear previous errors
+    setResetEmailError('');
+    
+    if (!trimmedResetEmail) {
       Alert.alert('Error', 'Please enter your email');
       return;
     }
-    Alert.alert('Success', `Reset link sent to ${resetEmail}`);
+
+    // Email validation
+    if (!validateEmail(trimmedResetEmail)) {
+      setResetEmailError('Please enter a valid email address');
+      return;
+    }
+
+    Alert.alert('Success', `Reset link sent to ${trimmedResetEmail}`);
   };
 
   // Input styles depending on theme mode
@@ -124,13 +207,16 @@ export default function LoginScreen({ onLoginSuccess }: Props) {
                   placeholder="Enter your email"
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="email"
+                  textContentType="emailAddress"
                   value={email}
-                  onChangeText={setEmail}
+                  onChangeText={handleEmailChange}
                   placeholderTextColor={placeholderTextColor}
                   style={{
                     borderRadius: 12,
                     borderWidth: 1,
-                    borderColor: inputBorderColor,
+                    borderColor: emailError ? '#ef4444' : inputBorderColor,
                     backgroundColor: inputBgColor,
                     color: theme.fontColor,
                     paddingVertical: 14,
@@ -138,6 +224,11 @@ export default function LoginScreen({ onLoginSuccess }: Props) {
                     fontSize: 16,
                   }}
                 />
+                {emailError ? (
+                  <Text style={{ color: '#ef4444', fontSize: 12, marginTop: 4 }}>
+                    {emailError}
+                  </Text>
+                ) : null}
               </View>
 
               <View style={{ marginBottom: 20 }}>
@@ -194,6 +285,7 @@ export default function LoginScreen({ onLoginSuccess }: Props) {
                   shadowRadius: 8,
                   shadowOffset: { width: 0, height: 3 },
                   elevation: 5,
+                  marginBottom: 10,
                 }}>
                 <Text
                   style={{
@@ -204,6 +296,8 @@ export default function LoginScreen({ onLoginSuccess }: Props) {
                   {isLoading ? 'Signing In...' : 'Sign In'}
                 </Text>
               </TouchableOpacity>
+              
+              
               {error ? (
                 <Text style={{ color: 'red', textAlign: 'center', marginTop: 10 }}>{error}</Text>
               ) : null}
@@ -224,13 +318,16 @@ export default function LoginScreen({ onLoginSuccess }: Props) {
                   placeholder="Enter your email"
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="email"
+                  textContentType="emailAddress"
                   value={resetEmail}
-                  onChangeText={setResetEmail}
+                  onChangeText={handleResetEmailChange}
                   placeholderTextColor={placeholderTextColor}
                   style={{
                     borderRadius: 12,
                     borderWidth: 1,
-                    borderColor: inputBorderColor,
+                    borderColor: resetEmailError ? '#ef4444' : inputBorderColor,
                     backgroundColor: inputBgColor,
                     color: theme.fontColor,
                     paddingVertical: 14,
@@ -238,6 +335,11 @@ export default function LoginScreen({ onLoginSuccess }: Props) {
                     fontSize: 16,
                   }}
                 />
+                {resetEmailError ? (
+                  <Text style={{ color: '#ef4444', fontSize: 12, marginTop: 4 }}>
+                    {resetEmailError}
+                  </Text>
+                ) : null}
               </View>
 
               <Text

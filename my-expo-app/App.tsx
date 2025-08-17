@@ -3,32 +3,30 @@ import { NavigationContainer } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Provider } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
+import { useEffect } from 'react';
 import './global.css';
 
 // Auth Context
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider } from './context/AuthContext';
 import ThemeProvider from './context/ThemeContext';
 
 // Store
 import { store } from './store';
+import { RootState, useAppDispatch } from './store';
+import { hydrateAuth } from './store/authSlice';
 
 // Screens
 import AccountCalculationScreen from './screens/AccountCalculationScreen';
-import CallScreen from './screens/CallScreen';
-import ChatScreen from './screens/ChatScreen';
 import CompanyLogoScreen from './screens/CompanyLogoScreen';
-import CreateGroupScreen from './screens/CreateGroupScreen';
 import CustomerBillScreen from './screens/CustomerBillScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import DipCalculationScreen from './screens/DipCalculationScreen';
 import EditProfileScreen from './screens/EditProfileScreen';
 import EmployeeScreen from './screens/EmployeeScreen';
-import GroupChatScreen from './screens/GroupChatScreen';
-import ImageViewerScreen from './screens/ImageViewerScreen';
 import InvoiceDetailScreen from './screens/InvoiceDetailScreen';
 import LoginScreen from './screens/LoginScreen';
 import MakeInvoiceScreen from './screens/MakeInvoiceScreen';
-import MessagesScreen from './screens/MessagesScreen';
 import PrintMakeInvoiceScreen from './screens/PrintMakeInvoiceScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import SettingsScreen from './screens/SettingsScreen';
@@ -42,10 +40,18 @@ import { RootStackParamList } from './types/types';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const AppNavigator = () => {
-  const { isAuthenticated, isLoading } = useAuth();
+  const dispatch = useAppDispatch();
+  const { isAuthenticated, isLoading, hydrated } = useSelector((state: RootState) => state.auth);
+
+  // Hydrate auth state on app startup
+  useEffect(() => {
+    if (!hydrated) {
+      dispatch(hydrateAuth());
+    }
+  }, [dispatch, hydrated]);
 
   // Show loading screen while checking authentication
-  if (isLoading) {
+  if (isLoading || !hydrated) {
     return null; // You can add a proper loading screen here
   }
 
@@ -118,16 +124,6 @@ const AppNavigator = () => {
             options={{ title: 'Invoice Details' }}
           />
           <Stack.Screen name="Settings" component={SettingsScreen} />
-          <Stack.Screen name="Messages" component={MessagesScreen} />
-          <Stack.Screen name="Chat" component={ChatScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="CallScreen" component={CallScreen} options={{ headerShown: false }} />
-          <Stack.Screen name="ImageViewer" component={ImageViewerScreen} />
-          <Stack.Screen name="CreateGroup" component={CreateGroupScreen} />
-          <Stack.Screen
-            name="GroupChat"
-            component={GroupChatScreen}
-            options={{ headerShown: false }}
-          />
         </>
       )}
     </Stack.Navigator>

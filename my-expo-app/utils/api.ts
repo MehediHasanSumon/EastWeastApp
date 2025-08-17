@@ -125,7 +125,9 @@ export type LoginResponse = {
 export async function loginApi(values: { email: string; password: string }): Promise<LoginResponse> {
   try {
     const deviceId = await getDeviceId();
-    const res = await api.post<LoginResponse>('/api/login', { ...values, deviceId });
+    const payload = { ...values, deviceId };
+    
+    const res = await api.post<LoginResponse>('/api/login', payload);
     return res.data;
   } catch (error: any) {
     console.error('Login API error:', error);
