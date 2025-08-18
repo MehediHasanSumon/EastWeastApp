@@ -11,6 +11,7 @@ import './global.css';
 import { AuthProvider } from './context/AuthContext';
 import ThemeProvider from './context/ThemeContext';
 import { ChatProvider } from './context/ChatContext';
+import { ToastProvider } from './context/ToastContext';
 
 // Store
 import { store } from './store';
@@ -155,9 +156,11 @@ export default function App() {
       <ThemeProvider>
         <AuthProvider>
           <ChatProvider>
-            <NavigationContainer>
-              <AppNavigator />
-            </NavigationContainer>
+            <ToastProvider>
+              <NavigationContainer>
+                <AppNavigator />
+              </NavigationContainer>
+            </ToastProvider>
           </ChatProvider>
         </AuthProvider>
       </ThemeProvider>

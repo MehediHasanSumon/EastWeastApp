@@ -189,7 +189,7 @@ const ConversationListScreen: React.FC = () => {
   );
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.bgColor }]}className='mt-12'>
+    <View style={[styles.container, { backgroundColor: theme.bgColor }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: theme.bgColor }]}>
         <Text style={[styles.headerTitle, { color: theme.fontColor }]}>Messages</Text>

@@ -3,6 +3,8 @@ export interface ChatUser {
   name: string;
   email: string;
   avatar?: string;
+  online?: boolean;
+  verified?: boolean;
   presence?: {
     status: 'online' | 'offline' | 'away';
     lastSeen?: Date;
@@ -19,21 +21,52 @@ export interface ChatMessage {
   fileName?: string;
   fileSize?: number;
   duration?: number;
+  attachments?: Array<{
+    id: string;
+    name: string;
+    type: string;
+    size: number;
+    url?: string;
+  }>;
   replyTo?: ChatMessage;
+  status?: 'sent' | 'delivered' | 'read';
   reactions: {
     [userId: string]: {
       type: string;
       emoji: string;
+      timestamp: string;
     };
   };
-  readBy: string[];
-  deliveredTo: string[];
   isEdited: boolean;
   editedAt?: Date;
   isDeleted: boolean;
   deletedAt?: Date;
+  canEdit: boolean;
+  canDelete: boolean;
+  readBy: string[];
+  deliveredTo: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface MessageReaction {
+  messageId: string;
+  userId: string;
+  type: string;
+  emoji: string;
+  timestamp: string;
+}
+
+export interface MessageEditData {
+  messageId: string;
+  newContent: string;
+  conversationId: string;
+}
+
+export interface MessageDeleteData {
+  messageId: string;
+  conversationId: string;
+  deleteForEveryone: boolean;
 }
 
 export interface ChatConversation {
