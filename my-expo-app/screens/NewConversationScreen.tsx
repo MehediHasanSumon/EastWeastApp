@@ -57,7 +57,7 @@ const NewConversationScreen: React.FC = () => {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.bgColor }]}>
+    <View className='mt-12' style={[styles.container, { backgroundColor: theme.bgColor }]}>
       {/* Header */}
       <View style={[styles.header, { backgroundColor: theme.bgColor }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>

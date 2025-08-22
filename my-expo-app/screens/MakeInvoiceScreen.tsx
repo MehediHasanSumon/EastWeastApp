@@ -403,7 +403,7 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
               className="rounded-xl border-2 border-gray-300 bg-gray-50 px-4 py-4 text-base"
               value={customerName}
               onChangeText={setCustomerName}
-              placeholder="Enter Customer Name"
+              placeholder="Enter Customer"
             />
           </View>
           <View className="flex-1">
@@ -414,7 +414,7 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
               className="rounded-xl border-2 border-gray-300 bg-gray-50 px-4 py-4 text-base"
               value={customerMobile}
               onChangeText={setCustomerMobile}
-              placeholder="e.g., +1234567890 or 1234567890"
+              placeholder="Enter Number"
               keyboardType="phone-pad"
             />
             <Text className="mt-1 text-xs text-gray-500">

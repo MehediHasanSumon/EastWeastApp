@@ -15,6 +15,7 @@ import {
   StatusBar,
   AppState,
   AppStateStatus,
+  Animated,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useAppDispatch, useAppSelector } from '../store';
@@ -31,6 +32,7 @@ import MessageActions from '../components/MessageActions';
 import MessageReactions from '../components/MessageReactions';
 import { useToast } from '../context/ToastContext';
 import ToastContainer from '../components/ToastContainer';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width, height } = Dimensions.get('window');
 
@@ -51,6 +53,8 @@ const ChatScreen: React.FC = () => {
   const flatListRef = useRef<FlatList>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const appState = useRef(AppState.currentState);
+  const inputHeightAnim = useRef(new Animated.Value(44)).current;
+  const sendButtonScaleAnim = useRef(new Animated.Value(0.8)).current;
 
   useEffect(() => {
     if (currentConversation) {
@@ -89,33 +93,33 @@ const ChatScreen: React.FC = () => {
       dispatch(addMessage(message));
       scrollToBottom();
       
-             // Show push notification if app is in background
-       if (appState.current !== 'active' && currentConversation) {
-         if (currentConversation.type === 'group') {
-           notificationService.showGroupChatNotification(
-             currentConversation.name || 'Group Chat',
-             message.sender.name,
-             message.content,
-             currentConversation._id
-           );
-         } else {
-           notificationService.showChatNotification(
-             message.sender.name,
-             message.content,
-             currentConversation._id
-           );
-         }
-       }
+      // Show push notification if app is in background
+      if (appState.current !== 'active' && currentConversation) {
+        if (currentConversation.type === 'group') {
+          notificationService.showGroupChatNotification(
+            currentConversation.name || 'Group Chat',
+            message.sender.name,
+            message.content,
+            currentConversation._id
+          );
+        } else {
+          notificationService.showChatNotification(
+            message.sender.name,
+            message.content,
+            currentConversation._id
+          );
+        }
+      }
        
-       // Show in-app toast notification
-       if (appState.current === 'active' && currentConversation) {
-         const senderName = message.sender.name || 'Unknown User';
-         const notificationMessage = currentConversation.type === 'group' 
-           ? `${currentConversation.name}: ${senderName}`
-           : senderName;
+      // Show in-app toast notification
+      if (appState.current === 'active' && currentConversation) {
+        const senderName = message.sender.name || 'Unknown User';
+        const notificationMessage = currentConversation.type === 'group' 
+          ? `${currentConversation.name}: ${senderName}`
+          : senderName;
          
-         showToast(`${notificationMessage}: ${message.content}`, 'info', 4000);
-       }
+        showToast(`${notificationMessage}: ${message.content}`, 'info', 4000);
+      }
     });
 
     // Listen for typing indicators
@@ -172,6 +176,21 @@ const ChatScreen: React.FC = () => {
   const handleSendMessage = async () => {
     if (!messageText.trim() || !currentConversation || isSending) return;
 
+    // Animate send button
+Animated.sequence([
+  Animated.timing(sendButtonScaleAnim, {
+    toValue: 1.2,
+    duration: 100,
+    useNativeDriver: true,
+  }),
+  Animated.timing(sendButtonScaleAnim, {
+    toValue: 1,
+    duration: 200,
+    useNativeDriver: true,
+  }),
+]).start();
+
+
     setIsSending(true);
     const messageData: SocketMessage = {
       conversationId: currentConversation._id,
@@ -183,6 +202,13 @@ const ChatScreen: React.FC = () => {
       await dispatch(sendMessage(messageData)).unwrap();
       setMessageText('');
       stopTyping();
+      
+      // Reset input height
+      Animated.timing(inputHeightAnim, {
+        toValue: 44,
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to send message');
     } finally {
@@ -192,6 +218,14 @@ const ChatScreen: React.FC = () => {
 
   const handleTyping = (text: string) => {
     setMessageText(text);
+    
+    // Animate input height based on content
+    const newHeight = Math.min(Math.max(44, text.split('\n').length * 20 + 24), 120);
+    Animated.timing(inputHeightAnim, {
+      toValue: newHeight,
+      duration: 100,
+      useNativeDriver: false,
+    }).start();
     
     if (!isTyping) {
       setIsTyping(true);
@@ -339,120 +373,147 @@ const ChatScreen: React.FC = () => {
     const isFirstInGroup = !prevMessage || prevMessage.sender._id !== item.sender._id;
 
     return (
-      <TouchableOpacity
+      <Animated.View
         style={[
           styles.messageContainer,
           own ? styles.ownMessageContainer : styles.otherMessageContainer,
           showSenderName && styles.firstMessageInGroup,
           isLastInGroup && styles.lastMessageInGroup
         ]}
-        onLongPress={() => handleMessageLongPress(item)}
-        delayLongPress={500}
-        activeOpacity={0.9}
       >
-        {showAvatar && (
-          <View style={styles.avatarContainer}>
-            <Image
-              source={
-                item.sender.avatar
-                  ? { uri: item.sender.avatar }
-                  : require('../assets/default-avatar.png')
-              }
-              style={styles.messageAvatar}
-            />
-            {item.sender.online && (
-              <View style={styles.onlineIndicator} />
+        <TouchableOpacity
+          onLongPress={() => handleMessageLongPress(item)}
+          delayLongPress={500}
+          activeOpacity={0.9}
+          style={styles.messageWrapper}
+        >
+          {showAvatar && (
+            <View style={styles.avatarContainer}>
+              <View style={styles.avatarBorder}>
+                <Image
+                  source={
+                    item.sender.avatar
+                      ? { uri: item.sender.avatar }
+                      : require('../assets/default-avatar.png')
+                  }
+                  style={styles.messageAvatar}
+                />
+                {item.sender.online && (
+                  <View style={styles.onlineIndicator} />
+                )}
+              </View>
+            </View>
+          )}
+          
+          <View style={[
+            styles.messageBubble,
+            own ? styles.ownBubble : styles.otherBubble,
+            showSenderName && styles.firstBubbleInGroup,
+            isLastInGroup && styles.lastBubbleInGroup,
+            isFirstInGroup && styles.firstBubbleInGroup,
+            !showAvatar && styles.noAvatarMargin
+          ]}>
+            {own ? (
+              <LinearGradient
+                colors={['#0084FF', '#0066CC']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.gradientBubble}
+              >
+                {renderMessageContent(item, own, showSenderName)}
+              </LinearGradient>
+            ) : (
+              <View style={styles.otherBubbleContent}>
+                {renderMessageContent(item, own, showSenderName)}
+              </View>
+            )}
+          </View>
+          
+          {/* Message Reactions */}
+          <MessageReactions
+            message={item}
+            onReactionPress={handleReactionPress}
+            onReactionLongPress={handleReactionLongPress}
+          />
+          
+          {/* Edit Indicator */}
+          {own && item.canEdit && !item.isDeleted && (
+            <View style={styles.editIndicator}>
+              <Ionicons name="create-outline" size={12} color={theme.fontColor + '66'} />
+            </View>
+          )}
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
+
+  const renderMessageContent = (item: ChatMessage, own: boolean, showSenderName: boolean) => {
+    return (
+      <>
+        {showSenderName && (
+          <View style={styles.senderInfo}>
+            <Text style={[styles.senderName, { color: own ? '#FFFFFF' + 'CC' : theme.fontColor + 'CC' }]}>
+              {item.sender.name || 'Unknown User'}
+            </Text>
+            {item.sender.verified && (
+              <Ionicons name="checkmark-circle" size={14} color={own ? "#FFFFFF" : "#0084FF"} style={styles.verifiedIcon} />
             )}
           </View>
         )}
         
         <View style={[
-          styles.messageBubble,
-          own ? styles.ownBubble : styles.otherBubble,
-          showSenderName && styles.firstBubbleInGroup,
-          isLastInGroup && styles.lastBubbleInGroup,
-          isFirstInGroup && styles.firstBubbleInGroup,
-          !showAvatar && styles.noAvatarMargin
+          styles.messageContent,
+          own ? styles.ownMessageContent : styles.otherMessageContent
         ]}>
-          {showSenderName && (
-            <View style={styles.senderInfo}>
-              <Text style={[styles.senderName, { color: theme.fontColor + 'CC' }]}>
-                {item.sender.name || 'Unknown User'}
-              </Text>
-              {item.sender.verified && (
-                <Ionicons name="checkmark-circle" size={14} color="#0084FF" style={styles.verifiedIcon} />
+          {item.isDeleted ? (
+            <Text style={[styles.deletedMessage, { color: own ? '#FFFFFF' + 'CC' : theme.fontColor + '99' }]}>
+              <Ionicons name="remove-circle" size={14} color={own ? '#FFFFFF' + 'CC' : theme.fontColor + '99'} />
+              {' '}This message was deleted
+            </Text>
+          ) : (
+            <Text style={[styles.messageText, { color: own ? '#FFFFFF' : theme.fontColor }]}>
+              {item.content}
+              {item.isEdited && (
+                <Text style={[styles.editedIndicator, { color: own ? '#FFFFFF' + 'CC' : theme.fontColor + '99' }]}>
+                  {' '}(edited)
+                </Text>
+              )}
+            </Text>
+          )}
+          
+          {item.attachments && item.attachments.length > 0 && (
+            <View style={styles.attachmentContainer}>
+              {item.attachments.map((attachment, idx) => (
+                <View key={idx} style={[styles.attachmentItem, { backgroundColor: own ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 132, 255, 0.1)' }]}>
+                  <Ionicons name="document" size={16} color={own ? '#FFFFFF' + 'CC' : '#0084FF'} />
+                  <Text style={[styles.attachmentText, { color: own ? '#FFFFFF' + 'CC' : '#0084FF' }]}>
+                    {attachment.name}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
+        
+        <View style={styles.messageFooter}>
+          <Text style={[styles.messageTime, { color: own ? '#FFFFFF' + 'CC' : theme.fontColor + '99' }]}>
+            {formatTime(item.createdAt)}
+          </Text>
+          {own && (
+            <View style={styles.messageStatus}>
+              {item.status === 'sent' && (
+                <Ionicons name="checkmark" size={14} color="#FFFFFF" style={styles.statusIcon} />
+              )}
+              {item.status === 'delivered' && (
+                <Ionicons name="checkmark-done" size={14} color="#FFFFFF" style={styles.statusIcon} />
+              )}
+              {item.status === 'read' && (
+                <Ionicons name="checkmark-done" size={14} color="#00D4FF" style={styles.statusIcon} />
               )}
             </View>
           )}
-          
-          <View style={[
-            styles.messageContent,
-            own ? styles.ownMessageContent : styles.otherMessageContent
-          ]}>
-            {item.isDeleted ? (
-              <Text style={[styles.deletedMessage, { color: own ? '#FFFFFF' + 'CC' : theme.fontColor + '99' }]}>
-                <Ionicons name="remove-circle" size={14} color={own ? '#FFFFFF' + 'CC' : theme.fontColor + '99'} />
-                {' '}This message was deleted
-              </Text>
-            ) : (
-              <Text style={[styles.messageText, { color: own ? '#FFFFFF' : theme.fontColor }]}>
-                {item.content}
-                {item.isEdited && (
-                  <Text style={[styles.editedIndicator, { color: own ? '#FFFFFF' + 'CC' : theme.fontColor + '99' }]}>
-                    {' '}(edited)
-                  </Text>
-                )}
-              </Text>
-            )}
-            
-            {item.attachments && item.attachments.length > 0 && (
-              <View style={styles.attachmentContainer}>
-                {item.attachments.map((attachment, idx) => (
-                  <View key={idx} style={styles.attachmentItem}>
-                    <Ionicons name="document" size={16} color={own ? '#FFFFFF' + 'CC' : theme.fontColor + '99'} />
-                    <Text style={[styles.attachmentText, { color: own ? '#FFFFFF' + 'CC' : theme.fontColor + '99' }]}>
-                      {attachment.name}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-          
-          <View style={styles.messageFooter}>
-            <Text style={[styles.messageTime, { color: own ? '#FFFFFF' + 'CC' : theme.fontColor + '99' }]}>
-              {formatTime(item.createdAt)}
-            </Text>
-            {own && (
-              <View style={styles.messageStatus}>
-                {item.status === 'sent' && (
-                  <Ionicons name="checkmark" size={14} color="#FFFFFF" style={styles.statusIcon} />
-                )}
-                {item.status === 'delivered' && (
-                  <Ionicons name="checkmark-done" size={14} color="#FFFFFF" style={styles.statusIcon} />
-                )}
-                {item.status === 'read' && (
-                  <Ionicons name="checkmark-done" size={14} color="#00D4FF" style={styles.statusIcon} />
-                )}
-              </View>
-            )}
-          </View>
         </View>
-        
-        {/* Message Reactions */}
-        <MessageReactions
-          message={item}
-          onReactionPress={handleReactionPress}
-          onReactionLongPress={handleReactionLongPress}
-        />
-        
-        {/* Edit Indicator */}
-        {own && item.canEdit && !item.isDeleted && (
-          <View style={styles.editIndicator}>
-            <Ionicons name="create-outline" size={12} color={theme.fontColor + '66'} />
-          </View>
-        )}
-      </TouchableOpacity>
+      </>
     );
   };
 
@@ -463,20 +524,20 @@ const ChatScreen: React.FC = () => {
     if (otherTypingUsers.length === 0) return null;
 
     return (
-      <View style={styles.typingContainer}>
-        <View style={[styles.typingBubble, styles.otherBubble]}>
+      <Animated.View style={styles.typingContainer}>
+        <View style={[styles.typingBubble, { backgroundColor: theme.mode === 'dark' ? '#3A3B3C' : '#F0F2F5' }]}>
           <View style={styles.typingContent}>
             <View style={styles.typingDots}>
-              <View style={[styles.dot, styles.dot1, { backgroundColor: theme.fontColor + '66' }]} />
-              <View style={[styles.dot, styles.dot2, { backgroundColor: theme.fontColor + '66' }]} />
-              <View style={[styles.dot, styles.dot3, { backgroundColor: theme.fontColor + '66' }]} />
+              <Animated.View style={[styles.dot, styles.dot1, { backgroundColor: theme.fontColor + '66' }]} />
+              <Animated.View style={[styles.dot, styles.dot2, { backgroundColor: theme.fontColor + '66' }]} />
+              <Animated.View style={[styles.dot, styles.dot3, { backgroundColor: theme.fontColor + '66' }]} />
             </View>
             <Text style={[styles.typingText, { color: theme.fontColor + '99' }]}>
               {otherTypingUsers.map(u => u.userName).join(', ')} {otherTypingUsers.length === 1 ? 'is' : 'are'} typing
             </Text>
           </View>
         </View>
-      </View>
+      </Animated.View>
     );
   };
 
@@ -493,14 +554,16 @@ const ChatScreen: React.FC = () => {
       return (
         <View style={styles.dateSeparator}>
           <View style={[styles.dateLine, { backgroundColor: theme.fontColor + '20' }]} />
-          <Text style={[styles.dateText, { color: theme.fontColor + '99' }]}>
-            {new Date(item.createdAt).toLocaleDateString('en-US', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric'
-            })}
-          </Text>
+          <View style={[styles.dateChip, { backgroundColor: theme.mode === 'dark' ? '#3A3B3C' : '#FFFFFF' }]}>
+            <Text style={[styles.dateText, { color: theme.fontColor + '99' }]}>
+              {new Date(item.createdAt).toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+              })}
+            </Text>
+          </View>
           <View style={[styles.dateLine, { backgroundColor: theme.fontColor + '20' }]} />
         </View>
       );
@@ -523,121 +586,143 @@ const ChatScreen: React.FC = () => {
   const conversationMessages = messages[currentConversation._id] || [];
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.mode === 'dark' ? '#1A1A1A' : '#F0F2F5' }]}>
+    <View className='mt-12' style={[styles.container, { backgroundColor: theme.mode === 'dark' ? '#0A0A0A' : '#FAFAFA' }]}>
       <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
       
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: theme.mode === 'dark' ? '#242526' : '#FFFFFF' }]}>
+      {/* Enhanced Header with Gradient */}
+      <LinearGradient
+        colors={theme.mode === 'dark' ? ['#1A1A1A', '#242526'] : ['#FFFFFF', '#F8F9FA']}
+        style={styles.header}
+      >
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={theme.fontColor} />
+          <View style={[styles.iconContainer, { backgroundColor: theme.mode === 'dark' ? '#3A3B3C' : '#F0F2F5' }]}>
+            <Ionicons name="arrow-back" size={20} color={theme.fontColor} />
+          </View>
         </TouchableOpacity>
         
-        <TouchableOpacity style={styles.headerInfo}>
-          <Image
-            source={
-              currentConversation.type === 'group' 
-                ? require('../assets/group-icon.png')
-                : currentConversation.participants.find(p => p._id !== user?._id)?.avatar
-                  ? { uri: currentConversation.participants.find(p => p._id !== user?._id)?.avatar }
-                  : require('../assets/default-avatar.png')
-            }
-            style={styles.headerAvatar}
-          />
+        <TouchableOpacity style={styles.headerInfo} activeOpacity={0.8}>
+          <View style={styles.avatarWrapper}>
+            <Image
+              source={
+                currentConversation.type === 'group' 
+                  ? require('../assets/group-icon.png')
+                  : currentConversation.participants.find(p => p._id !== user?._id)?.avatar
+                    ? { uri: currentConversation.participants.find(p => p._id !== user?._id)?.avatar }
+                    : require('../assets/default-avatar.png')
+              }
+              style={styles.headerAvatar}
+            />
+            <View style={styles.avatarBadge} />
+          </View>
           <View style={styles.headerTextContainer}>
-            <Text style={[styles.headerTitle, { color: theme.fontColor }]}>
+            <Text style={[styles.headerTitle, { color: theme.fontColor }]} numberOfLines={1}>
               {currentConversation.type === 'group' 
                 ? currentConversation.name || 'Group Chat'
                 : currentConversation.participants.find(p => p._id !== user?._id)?.name || 'Unknown User'
               }
             </Text>
-            <Text style={[styles.headerSubtitle, { color: theme.fontColor + '99' }]}>
+            <Text style={[styles.headerSubtitle, { color: theme.fontColor + '99' }]} numberOfLines={1}>
               {currentConversation.type === 'group' 
                 ? `${currentConversation.participants.length} members`
-                : 'Online'
+                : 'Active now'
               }
             </Text>
           </View>
         </TouchableOpacity>
         
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerActionButton}>
-            <Ionicons name="call" size={20} color={theme.fontColor} />
+          <TouchableOpacity style={[styles.headerActionButton, { backgroundColor: theme.mode === 'dark' ? '#3A3B3C' : '#F0F2F5' }]}>
+            <Ionicons name="call" size={18} color="#0084FF" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.headerActionButton}>
-            <Ionicons name="videocam" size={20} color={theme.fontColor} />
+          <TouchableOpacity style={[styles.headerActionButton, { backgroundColor: theme.mode === 'dark' ? '#3A3B3C' : '#F0F2F5' }]}>
+            <Ionicons name="videocam" size={18} color="#0084FF" />
           </TouchableOpacity>
           <TouchableOpacity 
-            style={styles.headerActionButton}
+            style={[styles.headerActionButton, { backgroundColor: theme.mode === 'dark' ? '#3A3B3C' : '#F0F2F5' }]}
             onPress={() => setShowUserInfo(true)}
           >
-            <Ionicons name="information-circle" size={20} color={theme.fontColor} />
+            <Ionicons name="information-circle" size={18} color="#0084FF" />
           </TouchableOpacity>
         </View>
+      </LinearGradient>
+
+      {/* Messages with Custom Background */}
+      <View style={styles.messagesBackground}>
+        <FlatList
+          ref={flatListRef}
+          data={conversationMessages}
+          renderItem={({ item, index }) => (
+            <>
+              {renderDateSeparator({ item, index })}
+              {renderMessage({ item, index })}
+            </>
+          )}
+          keyExtractor={(item, index) => `${item._id}-${index}`}
+          style={styles.messagesList}
+          contentContainerStyle={styles.messagesContent}
+          showsVerticalScrollIndicator={false}
+          onContentSizeChange={scrollToBottom}
+          ListFooterComponent={renderTypingIndicator}
+          inverted={false}
+        />
       </View>
 
-      {/* Messages */}
-      <FlatList
-        ref={flatListRef}
-        data={conversationMessages}
-        renderItem={({ item, index }) => (
-          <>
-            {renderDateSeparator({ item, index })}
-            {renderMessage({ item, index })}
-          </>
-        )}
-        keyExtractor={(item) => item._id}
-        style={styles.messagesList}
-        contentContainerStyle={styles.messagesContent}
-        showsVerticalScrollIndicator={false}
-        onContentSizeChange={scrollToBottom}
-        ListFooterComponent={renderTypingIndicator}
-        inverted={false}
-      />
-
-      {/* Input Area */}
-      <View style={[styles.inputContainer, { backgroundColor: theme.mode === 'dark' ? '#242526' : '#FFFFFF' }]}>
-        <View style={styles.inputActions}>
-          <TouchableOpacity style={styles.actionButton} onPress={handleDocumentPicker}>
-            <Ionicons name="attach" size={22} color={theme.fontColor + 'CC'} />
-          </TouchableOpacity>
+      {/* Enhanced Input Area */}
+      <View style={[styles.inputContainer, { backgroundColor: theme.mode === 'dark' ? '#1A1A1A' : '#FFFFFF' }]}>
+        <View style={styles.inputWrapper}>
+          <View style={styles.inputActions}>
+            <TouchableOpacity style={[styles.actionButton, { backgroundColor: theme.mode === 'dark' ? '#3A3B3C' : '#F0F2F5' }]} onPress={handleDocumentPicker}>
+              <Ionicons name="add" size={20} color="#0084FF" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={[styles.actionButton, { backgroundColor: theme.mode === 'dark' ? '#3A3B3C' : '#F0F2F5' }]} onPress={handleImagePicker}>
+              <Ionicons name="camera" size={20} color="#0084FF" />
+            </TouchableOpacity>
+          </View>
           
-          <TouchableOpacity style={styles.actionButton} onPress={handleImagePicker}>
-            <Ionicons name="camera" size={22} color={theme.fontColor + 'CC'} />
-          </TouchableOpacity>
+<Animated.View style={[
+  styles.textInputContainer, 
+  { 
+    backgroundColor: theme.mode === 'dark' ? '#2A2A2A' : '#FFFFFF', // More contrast
+    height: inputHeightAnim,
+    borderWidth: 1,
+    borderColor: theme.mode === 'dark' ? '#3A3B3C' : '#E4E6EB', // Add border for better definition
+  }
+          ]}>
+            <TextInput
+              style={[styles.textInput, { color: theme.fontColor }]}
+              value={messageText}
+              onChangeText={handleTyping}
+              placeholder="Type a message..."
+              placeholderTextColor={theme.fontColor + '66'}
+              multiline
+              maxLength={1000}
+            />
+          </Animated.View>
+          
+          <Animated.View style={[styles.sendButtonWrapper, { transform: [{ scale: sendButtonScaleAnim }] }]}>
+            <TouchableOpacity
+              style={[
+                styles.sendButton,
+                { 
+                  backgroundColor: messageText.trim() 
+                    ? '#0084FF' 
+                    : (theme.mode === 'dark' ? '#3A3B3C' : '#E4E6EB')
+                }
+              ]}
+              onPress={handleSendMessage}
+              disabled={!messageText.trim() || isSending}
+            >
+              {isSending ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : messageText.trim() ? (
+                <Ionicons name="send" size={16} color="#fff" />
+              ) : (
+                <Ionicons name="mic" size={16} color={theme.fontColor + '66'} />
+              )}
+            </TouchableOpacity>
+          </Animated.View>
         </View>
-        
-        <View style={[styles.textInputContainer, { backgroundColor: theme.mode === 'dark' ? '#3A3B3C' : '#F0F2F5' }]}>
-          <TextInput
-            style={[styles.textInput, { color: theme.fontColor }]}
-            value={messageText}
-            onChangeText={handleTyping}
-            placeholder="Aa"
-            placeholderTextColor={theme.fontColor + '66'}
-            multiline
-            maxLength={1000}
-          />
-        </View>
-        
-        <TouchableOpacity
-          style={[
-            styles.sendButton,
-            { 
-              backgroundColor: messageText.trim() 
-                ? (theme.mode === 'dark' ? '#6366F1' : '#0084FF') 
-                : (theme.mode === 'dark' ? '#3A3B3C' : '#F0F2F5')
-            }
-          ]}
-          onPress={handleSendMessage}
-          disabled={!messageText.trim() || isSending}
-        >
-          {isSending ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : messageText.trim() ? (
-            <Ionicons name="send" size={18} color="#fff" />
-          ) : (
-            <Ionicons name="mic" size={18} color={theme.fontColor + '66'} />
-          )}
-        </TouchableOpacity>
       </View>
 
       {/* User Info Modal */}
@@ -681,62 +766,94 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#E4E6EB',
-    elevation: 2,
+    paddingTop: Platform.OS === 'ios' ? 44 : 12,
+    elevation: 8,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    borderBottomWidth: 0,
   },
   backButton: {
-    padding: 8,
-    marginRight: 8,
+    marginRight: 12,
+  },
+  iconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerInfo: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
   },
+  avatarWrapper: {
+    position: 'relative',
+    marginRight: 12,
+  },
   headerAvatar: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    marginRight: 12,
+    borderWidth: 2,
+    borderColor: '#0084FF',
+  },
+  avatarBadge: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#4CAF50',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
   headerTextContainer: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 17,
+    fontWeight: '700',
     marginBottom: 2,
+    letterSpacing: -0.2,
   },
   headerSubtitle: {
     fontSize: 13,
+    fontWeight: '500',
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
   },
   headerActionButton: {
-    padding: 8,
-    marginLeft: 4,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  messagesBackground: {
+    flex: 1,
+    position: 'relative',
   },
   messagesList: {
     flex: 1,
   },
   messagesContent: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 12,
   },
   messageContainer: {
-    flexDirection: 'row',
-    marginVertical: 2,
+    marginVertical: 1,
     maxWidth: width * 0.85,
-    borderRadius: 8,
-    overflow: 'hidden',
-    backgroundColor: 'transparent',
+  },
+  messageWrapper: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
   },
   ownMessageContainer: {
     alignSelf: 'flex-end',
@@ -747,68 +864,83 @@ const styles = StyleSheet.create({
     marginRight: width * 0.15,
   },
   firstMessageInGroup: {
-    marginTop: 8,
+    marginTop: 12,
   },
   lastMessageInGroup: {
-    marginBottom: 8,
+    marginBottom: 12,
+  },
+  avatarContainer: {
+    marginRight: 8,
+    marginBottom: 4,
+  },
+  avatarBorder: {
+    position: 'relative',
   },
   messageAvatar: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    marginRight: 8,
-    marginTop: 2,
-  },
-  avatarContainer: {
-    position: 'relative',
+    borderWidth: 1.5,
+    borderColor: '#E4E6EB',
   },
   onlineIndicator: {
     position: 'absolute',
-    bottom: -2,
-    right: -2,
+    bottom: -1,
+    right: -1,
     width: 10,
     height: 10,
     borderRadius: 5,
     backgroundColor: '#4CAF50',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
   },
   messageBubble: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 20,
+    borderRadius: 18,
     maxWidth: width * 0.75,
-    minWidth: 80,
+    minWidth: 60,
     position: 'relative',
+    overflow: 'hidden',
+  },
+  gradientBubble: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 18,
   },
   ownBubble: {
-    backgroundColor: '#0084FF',
-    borderBottomRightRadius: 6,
+    alignSelf: 'flex-end',
+    borderBottomRightRadius: 4,
+    elevation: 4,
     shadowColor: '#0084FF',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.25,
     shadowRadius: 4,
-    elevation: 3,
   },
   otherBubble: {
-    backgroundColor: '#FFFFFF',
-    borderBottomLeftRadius: 6,
+    alignSelf: 'flex-start',
+    borderBottomLeftRadius: 4,
+    elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 2,
-    borderWidth: 0.5,
+  },
+  otherBubbleContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    borderWidth: 1,
     borderColor: '#E4E6EB',
   },
   firstBubbleInGroup: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
   },
   lastBubbleInGroup: {
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    // Custom radius handled by own/other bubble styles
   },
   noAvatarMargin: {
-    marginLeft: 0, // No margin if avatar is not shown
+    marginLeft: 36,
   },
   senderInfo: {
     flexDirection: 'row',
@@ -817,66 +949,66 @@ const styles = StyleSheet.create({
   },
   senderName: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
+    letterSpacing: 0.2,
   },
   verifiedIcon: {
     marginLeft: 4,
   },
   messageContent: {
-    // Basic styles for message content
+    // Container for message text and attachments
   },
   ownMessageContent: {
-    // Styles for own messages
+    // Styles for own message content
   },
   otherMessageContent: {
-    // Styles for other messages
+    // Styles for other message content
   },
   messageText: {
     fontSize: 16,
-    lineHeight: 22,
+    lineHeight: 20,
     fontWeight: '400',
-    letterSpacing: 0.2,
+    letterSpacing: -0.1,
   },
   editedIndicator: {
-    fontSize: 12,
+    fontSize: 11,
     fontStyle: 'italic',
     opacity: 0.8,
+    fontWeight: '500',
   },
   deletedMessage: {
     fontSize: 14,
     fontStyle: 'italic',
     opacity: 0.7,
     textAlign: 'center',
+    fontWeight: '500',
   },
   editIndicator: {
     position: 'absolute',
-    top: 8,
-    right: 8,
+    top: 6,
+    right: 6,
     padding: 4,
     borderRadius: 8,
     backgroundColor: 'rgba(0, 0, 0, 0.1)',
   },
   attachmentContainer: {
-    flexDirection: 'row',
     marginTop: 8,
-    flexWrap: 'wrap',
+    gap: 6,
   },
   attachmentItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginRight: 8,
-    marginBottom: 4,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
+    borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   attachmentText: {
     fontSize: 13,
-    marginLeft: 6,
-    fontWeight: '500',
+    marginLeft: 8,
+    fontWeight: '600',
+    flex: 1,
   },
   messageFooter: {
     flexDirection: 'row',
@@ -887,6 +1019,7 @@ const styles = StyleSheet.create({
   messageTime: {
     fontSize: 11,
     marginRight: 4,
+    fontWeight: '500',
   },
   messageStatus: {
     flexDirection: 'row',
@@ -894,11 +1027,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
   },
   statusIcon: {
-    marginLeft: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1,
+    marginLeft: 1,
   },
   typingContainer: {
     marginVertical: 8,
@@ -907,14 +1036,14 @@ const styles = StyleSheet.create({
   typingBubble: {
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderRadius: 20,
-    borderBottomLeftRadius: 6,
+    borderRadius: 18,
+    borderBottomLeftRadius: 4,
     maxWidth: width * 0.6,
+    elevation: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 2,
-    elevation: 1,
   },
   typingContent: {
     flexDirection: 'row',
@@ -925,11 +1054,10 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 4,
-    opacity: 0.7,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 3,
   },
   dot1: {
     opacity: 0.4,
@@ -941,76 +1069,100 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   typingText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '500',
   },
   dateSeparator: {
     flexDirection: 'row',
     alignItems: 'center',
     marginVertical: 20,
-    marginHorizontal: 16,
+    marginHorizontal: 20,
   },
   dateLine: {
     flex: 1,
     height: 1,
-    borderRadius: 0.5,
+  },
+  dateChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   dateText: {
-    fontSize: 12,
-    marginHorizontal: 12,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 0.8,
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderTopWidth: 0.5,
-    borderTopColor: '#E4E6EB',
+    paddingBottom: Platform.OS === 'ios' ? 34 : 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.1)',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
   },
   inputActions: {
     flexDirection: 'row',
-    marginRight: 8,
+    gap: 6,
   },
   actionButton: {
-    padding: 8,
-    marginRight: 4,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  textInputContainer: {
+ textInputContainer: {
     flex: 1,
-    borderRadius: 24,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    marginRight: 8,
-    maxHeight: 120,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8, // Reduced padding
     minHeight: 44,
-    borderWidth: 1,
-    borderColor: 'transparent',
+    maxHeight: 120,
+    justifyContent: 'center',
   },
   textInput: {
     fontSize: 16,
-    maxHeight: 100,
-    minHeight: 20,
     fontWeight: '400',
+    lineHeight: 20,
+    textAlignVertical: 'center',
+    padding: 0, // Remove default padding
+    margin: 0, // Remove default margin
+  },
+  sendButtonWrapper: {
+    // Wrapper for send button animation
   },
   sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
+    elevation: 4,
+    shadowColor: '#0084FF',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.3,
     shadowRadius: 4,
-    elevation: 2,
   },
   errorText: {
     textAlign: 'center',
     marginTop: 50,
     fontSize: 16,
+    fontWeight: '500',
   },
 });
 
