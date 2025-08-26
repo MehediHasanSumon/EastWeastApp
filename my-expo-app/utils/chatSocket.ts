@@ -1,26 +1,6 @@
 import { io, Socket } from 'socket.io-client';
-import { getRefreshToken } from './authStorage';
-import { ChatMessage, SocketMessage, TypingUser, CallInvite, CallType } from '../types/chat';
-import Constants from 'expo-constants';
-
-// Configure socket URL for different environments
-function getSocketUrl(): string {
-  // Try to get from app config first (for production builds)
-  const appConfig = Constants.expoConfig?.extra;
-  const envSocketUrl = appConfig?.EXPO_PUBLIC_SOCKET_URL || process.env.EXPO_PUBLIC_SOCKET_URL;
-  const envBackendHost = appConfig?.EXPO_PUBLIC_BACKEND_HOST || process.env.EXPO_PUBLIC_BACKEND_HOST || process.env.BACKEND_HOST;
-  
-  // Production environment
-  if (process.env.NODE_ENV === 'production' || appConfig?.NODE_ENV === 'production') {
-    return envSocketUrl || 'https://your-production-domain.com';
-  }
-  
-  // Development environment - use the same logic as API
-  if (envBackendHost) return envBackendHost;
-  
-  // Default to localhost for development
-  return 'http://10.0.2.2:8000';
-}
+import { IMessage, ISocketMessage, ITypingData } from '../types/chat';
+import { getSocketUrl } from '../config/environment';
 
 class ChatSocketService {
   private socket: Socket | null = null;
@@ -29,260 +9,9 @@ class ChatSocketService {
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
   private listeners: Map<string, Function[]> = new Map();
+  private authToken: string | null = null;
 
-  async connect() {
-    if (this.socket && this.isConnected) {
-      return;
-    }
-
-    const token = await getRefreshToken();
-    if (!token) {
-      console.error('No refresh token available for socket connection');
-      return;
-    }
-
-    const socketUrl = getSocketUrl();
-    console.log('Connecting to socket server:', socketUrl);
-
-    this.socket = io(socketUrl, {
-      auth: {
-        token: token,
-      },
-      transports: ['polling', 'websocket'],
-      reconnection: true,
-      reconnectionAttempts: this.maxReconnectAttempts,
-      reconnectionDelay: this.reconnectDelay,
-      reconnectionDelayMax: 5000,
-      // Add timeout for production
-      timeout: 20000,
-      // Add force new connection for better reliability
-      forceNew: true,
-    });
-
-    this.setupEventListeners();
-  }
-
-  private setupEventListeners() {
-    if (!this.socket) return;
-
-    this.socket.on('connect', () => {
-      console.log('Connected to chat server');
-      this.isConnected = true;
-      this.reconnectAttempts = 0;
-      this.emit('socket_connected');
-    });
-
-    this.socket.on('disconnect', () => {
-      console.log('Disconnected from chat server');
-      this.isConnected = false;
-      this.emit('socket_disconnected');
-    });
-
-    this.socket.on('connect_error', (error) => {
-      console.error('Socket connection error:', error);
-      this.reconnectAttempts++;
-      if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-        console.error('Max reconnection attempts reached');
-      }
-    });
-
-    // Chat events
-    this.socket.on('new_message', (message: ChatMessage) => {
-      this.emit('new_message', message);
-    });
-
-    this.socket.on('message_edited', (data: { messageId: string; content: string }) => {
-      this.emit('message_edited', data);
-    });
-
-    this.socket.on('message_deleted', (data: { messageId: string }) => {
-      this.emit('message_deleted', data);
-    });
-
-    this.socket.on('message_reaction', (data: { messageId: string; userId: string; reaction: any }) => {
-      this.emit('message_reaction', data);
-    });
-
-    this.socket.on('typing_start', (data: { conversationId: string; userId: string; userName: string }) => {
-      this.emit('typing_start', data);
-    });
-
-    this.socket.on('typing_stop', (data: { conversationId: string; userId: string }) => {
-      this.emit('typing_stop', data);
-    });
-
-    this.socket.on('user_presence', (data: { userId: string; status: 'online' | 'offline' | 'away' }) => {
-      this.emit('user_presence', data);
-    });
-
-    this.socket.on('message_delivered', (data: { messageId: string; userId: string }) => {
-      this.emit('message_delivered', data);
-    });
-
-    this.socket.on('message_read', (data: { messageId: string; userId: string }) => {
-      this.emit('message_read', data);
-    });
-
-    this.socket.on('unread_counts_updated', (data: { conversationId: string }) => {
-      this.emit('unread_counts_updated', data);
-    });
-
-    this.socket.on('conversation_updated', (data: { conversation: any }) => {
-      this.emit('conversation_updated', data);
-    });
-
-    // Call events
-    this.socket.on('call_invite', (data: CallInvite) => {
-      this.emit('call_invite', data);
-    });
-
-    this.socket.on('call_accepted', (data: { conversationId: string; fromUserId: string }) => {
-      this.emit('call_accepted', data);
-    });
-
-    this.socket.on('call_rejected', (data: { conversationId: string; fromUserId: string; reason: string }) => {
-      this.emit('call_rejected', data);
-    });
-
-    this.socket.on('call_cancelled', (data: { conversationId: string; fromUserId: string }) => {
-      this.emit('call_cancelled', data);
-    });
-
-    this.socket.on('call_ended', (data: { conversationId: string; fromUserId: string }) => {
-      this.emit('call_ended', data);
-    });
-
-    this.socket.on('webrtc_signal', (data: { conversationId: string; signal: any }) => {
-      this.emit('webrtc_signal', data);
-    });
-
-    this.socket.on('error', (error: any) => {
-      console.error('Socket error:', error);
-      this.emit('error', error);
-    });
-  }
-
-  // Join a conversation room
-  joinConversation(conversationId: string) {
-    if (this.socket && this.isConnected) {
-      this.socket.emit('join_conversation', { conversationId });
-    }
-  }
-
-  // Leave a conversation room
-  leaveConversation(conversationId: string) {
-    if (this.socket && this.isConnected) {
-      this.socket.emit('leave_conversation', { conversationId });
-    }
-  }
-
-  // Send a message
-  sendMessage(messageData: SocketMessage): Promise<{ success: boolean; message?: ChatMessage; error?: string }> {
-    return new Promise((resolve) => {
-      if (!this.socket || !this.isConnected) {
-        resolve({ success: false, error: 'Not connected to server' });
-        return;
-      }
-
-      this.socket.emit('send_message', messageData, (response: any) => {
-        resolve(response);
-      });
-    });
-  }
-
-  // Start typing indicator
-  startTyping(conversationId: string) {
-    if (this.socket && this.isConnected) {
-      this.socket.emit('typing_start', { conversationId });
-    }
-  }
-
-  // Stop typing indicator
-  stopTyping(conversationId: string) {
-    if (this.socket && this.isConnected) {
-      this.socket.emit('typing_stop', { conversationId });
-    }
-  }
-
-  // Mark message as read
-  markMessageAsRead(messageId: string) {
-    if (this.socket && this.isConnected) {
-      this.socket.emit('mark_as_read', { messageId });
-    }
-  }
-
-  // Mark conversation as read
-  markConversationAsRead(conversationId: string) {
-    if (this.socket && this.isConnected) {
-      this.socket.emit('mark_as_read', { conversationId });
-    }
-  }
-
-  // React to a message
-  reactToMessage(messageId: string, reaction: { type: string; emoji: string }) {
-    if (this.socket && this.isConnected) {
-      this.socket.emit('message_reaction', { messageId, reaction });
-    }
-  }
-
-  // Edit a message
-  editMessage(messageId: string, content: string) {
-    if (this.socket && this.isConnected) {
-      this.socket.emit('edit_message', { messageId, content });
-    }
-  }
-
-  // Delete a message
-  deleteMessage(messageId: string) {
-    if (this.socket && this.isConnected) {
-      this.socket.emit('delete_message', { messageId });
-    }
-  }
-
-  // Call-related methods
-  inviteToCall(conversationId: string, callType: CallType) {
-    if (!this.socket || !this.isConnected) {
-      throw new Error('Socket not connected');
-    }
-    this.socket.emit('call_invite', { conversationId, callType });
-  }
-
-  acceptCall(conversationId: string) {
-    if (!this.socket || !this.isConnected) {
-      throw new Error('Socket not connected');
-    }
-    this.socket.emit('call_accepted', { conversationId });
-  }
-
-  rejectCall(conversationId: string, reason: string = 'declined') {
-    if (!this.socket || !this.isConnected) {
-      throw new Error('Socket not connected');
-    }
-    this.socket.emit('call_rejected', { conversationId, reason });
-  }
-
-  cancelCall(conversationId: string) {
-    if (!this.socket || !this.isConnected) {
-      throw new Error('Socket not connected');
-    }
-    this.socket.emit('call_cancelled', { conversationId });
-  }
-
-  endCall(conversationId: string) {
-    if (!this.socket || !this.isConnected) {
-      throw new Error('Socket not connected');
-    }
-    this.socket.emit('call_ended', { conversationId });
-  }
-
-  sendWebRTCSignal(conversationId: string, signal: any) {
-    if (!this.socket || !this.isConnected) {
-      throw new Error('Socket not connected');
-    }
-    this.socket.emit('webrtc_signal', { conversationId, signal });
-  }
-
-  // Event listener management
+  // Event listeners
   on(event: string, callback: Function) {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, []);
@@ -304,14 +33,203 @@ class ChatSocketService {
     }
   }
 
-  private emit(event: string, data?: any) {
+  emit(event: string, data: any) {
+    if (this.socket && this.isConnected) {
+      this.socket.emit(event, data);
+    }
+  }
+
+  connect(token?: string) {
+    if (this.socket && this.isConnected) {
+      console.log('Socket already connected, skipping connection attempt');
+      return;
+    }
+
+    if (token) {
+      this.authToken = token;
+      console.log('Refresh token set for socket connection');
+    }
+
+    if (!this.authToken) {
+      console.error('No refresh token found for socket connection');
+      return;
+    }
+
+    // Avoid duplicate connection attempts
+    if (this.socket && (this.socket.connected || (this.socket as any).active)) {
+      console.log('Socket connection already active, skipping connection attempt');
+      return;
+    }
+
+    try {
+      // Use environment configuration for socket URL
+      const socketUrl = getSocketUrl();
+      console.log('Connecting to socket server:', socketUrl);
+      console.log('Using refresh token for authentication:', this.authToken ? 'Present' : 'Missing');
+      
+      this.socket = io(socketUrl, {
+        auth: { 
+          token: this.authToken, // Send refresh token in auth object (like web app)
+        },
+        transports: ['polling', 'websocket'],
+        reconnection: true,
+        reconnectionAttempts: this.maxReconnectAttempts,
+        reconnectionDelay: this.reconnectDelay,
+        reconnectionDelayMax: 5000,
+        timeout: 20000,
+        forceNew: true,
+        upgrade: true,
+        rememberUpgrade: false,
+        autoConnect: true,
+      });
+
+      this.setupEventListeners();
+      console.log('Socket connection setup completed');
+    } catch (error) {
+      console.error('Failed to create socket connection:', error);
+      this.triggerListeners('socket_error', error);
+    }
+  }
+
+  private setupEventListeners() {
+    if (!this.socket) return;
+
+    this.socket.on('connect', () => {
+      console.log('Socket connected successfully');
+      console.log('Socket ID:', this.socket?.id);
+      console.log('Socket transport:', this.socket?.io?.engine?.transport?.name);
+      this.isConnected = true;
+      this.reconnectAttempts = 0;
+      this.triggerListeners('socket_connected');
+    });
+
+    this.socket.on('disconnect', (reason) => {
+      console.log('Socket disconnected:', reason);
+      this.isConnected = false;
+      this.triggerListeners('socket_disconnected', reason);
+      
+      if (reason === 'io server disconnect') {
+        // Server disconnected us, try to reconnect
+        console.log('Server disconnected us, attempting to reconnect...');
+        this.socket?.connect();
+      } else if (reason === 'io client disconnect') {
+        console.log('Client initiated disconnect');
+      } else if (reason === 'transport close') {
+        console.log('Transport closed');
+      } else if (reason === 'transport error') {
+        console.log('Transport error occurred');
+      }
+    });
+
+    this.socket.on('connect_error', (error) => {
+      console.error('Socket connection error:', error);
+      this.isConnected = false;
+      this.triggerListeners('socket_error', error);
+      
+      // Log additional connection details for debugging
+      console.log('Socket connection details:', {
+        url: this.socket?.io?.uri,
+        auth: this.authToken ? 'Refresh token present' : 'No refresh token',
+        transports: this.socket?.io?.opts?.transports,
+        errorMessage: error.message,
+        errorType: error.type,
+      });
+      
+      // Try to get more specific error information
+      if (error.message.includes('xhr poll error')) {
+        console.error('XHR Poll Error - This usually means:');
+        console.error('1. Server is not running');
+        console.error('2. Wrong server URL');
+        console.error('3. CORS issues');
+        console.error('4. Network connectivity problems');
+      }
+      
+      // Check for authentication-specific errors
+      if (error.message.includes('Authentication error') || error.message.includes('Unauthorized')) {
+        console.error('Authentication Error - This usually means:');
+        console.error('1. Invalid or expired refresh token');
+        console.error('2. User not found on server');
+        console.error('3. Token format is incorrect');
+        console.error('4. Server authentication middleware failed');
+      }
+    });
+
+    this.socket.on('reconnect', (attemptNumber) => {
+      console.log('Socket reconnected after', attemptNumber, 'attempts');
+      this.isConnected = true;
+      this.triggerListeners('socket_reconnected', attemptNumber);
+    });
+
+    this.socket.on('reconnect_error', (error) => {
+      console.error('Socket reconnection error:', error);
+      this.reconnectAttempts++;
+      
+      if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+        console.error('Max reconnection attempts reached');
+        this.triggerListeners('socket_max_reconnect_attempts');
+      }
+    });
+
+    this.socket.on('reconnect_failed', () => {
+      console.error('Socket reconnection failed');
+      this.triggerListeners('socket_reconnect_failed');
+    });
+
+    // Chat-specific events
+    this.socket.on('new_message', (message: IMessage) => {
+      console.log('New message received:', message);
+      this.triggerListeners('new_message', message);
+    });
+
+    this.socket.on('message_delivered', (data: { messageId: string; conversationId: string }) => {
+      console.log('Message delivered:', data);
+      this.triggerListeners('message_delivered', data);
+    });
+
+    this.socket.on('message_read', (data: { messageId: string; conversationId: string; userId: string }) => {
+      console.log('Message read:', data);
+      this.triggerListeners('message_read', data);
+    });
+
+    this.socket.on('typing_start', (data: ITypingData) => {
+      console.log('Typing started:', data);
+      this.triggerListeners('typing_start', data);
+    });
+
+    this.socket.on('typing_stop', (data: ITypingData) => {
+      console.log('Typing stopped:', data);
+      this.triggerListeners('typing_stop', data);
+    });
+
+    this.socket.on('conversation_updated', (data: { conversation: any }) => {
+      console.log('Conversation updated:', data);
+      this.triggerListeners('conversation_updated', data);
+    });
+
+    this.socket.on('user_online', (data: { userId: string; userName: string }) => {
+      console.log('User online:', data);
+      this.triggerListeners('user_online', data);
+    });
+
+    this.socket.on('user_offline', (data: { userId: string; userName: string }) => {
+      console.log('User offline:', data);
+      this.triggerListeners('user_offline', data);
+    });
+
+    this.socket.on('error', (error: any) => {
+      console.error('Socket error:', error);
+      this.triggerListeners('error', error);
+    });
+  }
+
+  private triggerListeners(event: string, data?: any) {
     const callbacks = this.listeners.get(event);
     if (callbacks) {
       callbacks.forEach(callback => {
         try {
           callback(data);
         } catch (error) {
-          console.error(`Error in socket event listener for ${event}:`, error);
+          console.error(`Error in socket listener for event ${event}:`, error);
         }
       });
     }
@@ -321,14 +239,50 @@ class ChatSocketService {
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
-      this.isConnected = false;
-      this.listeners.clear();
     }
+    this.isConnected = false;
+    this.listeners.clear();
   }
 
-  getConnectionStatus(): boolean {
+  // Chat-specific methods
+  joinConversation(conversationId: string) {
+    this.emit('join_conversation', { conversationId });
+  }
+
+  leaveConversation(conversationId: string) {
+    this.emit('leave_conversation', { conversationId });
+  }
+
+  sendMessage(messageData: ISocketMessage) {
+    this.emit('send_message', messageData);
+  }
+
+  startTyping(conversationId: string) {
+    this.emit('typing_start', { conversationId });
+  }
+
+  stopTyping(conversationId: string) {
+    this.emit('typing_stop', { conversationId });
+  }
+
+  markConversationAsRead(conversationId: string) {
+    this.emit('mark_conversation_read', { conversationId });
+  }
+
+  markMessageAsRead(messageId: string, conversationId: string) {
+    this.emit('mark_message_read', { messageId, conversationId });
+  }
+
+  // Utility methods
+  getConnectionStatus() {
     return this.isConnected;
+  }
+
+  getSocket() {
+    return this.socket;
   }
 }
 
+// Export singleton instance
 export const chatSocketService = new ChatSocketService();
+export default chatSocketService;

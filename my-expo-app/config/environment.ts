@@ -2,7 +2,7 @@
 export const ENV = {
   // Backend Configuration
   BACKEND_HOST: process.env.EXPO_PUBLIC_BACKEND_HOST || (__DEV__ ? 'http://10.0.2.2:8000' : 'https://your-production-backend.com'),
-  SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL || (__DEV__ ? 'ws://10.0.2.2:8000' : 'wss://your-production-backend.com'),
+  SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL || (__DEV__ ? 'http://10.0.2.2:8000' : 'https://your-production-backend.com'),
   
   // Environment
   NODE_ENV: process.env.NODE_ENV || 'development',

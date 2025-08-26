@@ -187,9 +187,7 @@ export type RootStackParamList = {
   ImageViewer: {
     uri: string;
   };
-  ConversationList: undefined;
-  ChatScreen: undefined;
-  NewConversationScreen: undefined;
+  Messenger: undefined;
 };
 
 export type SafeRoutes = Exclude<

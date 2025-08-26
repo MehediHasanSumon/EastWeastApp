@@ -33,9 +33,7 @@ import MakeInvoiceScreen from './screens/MakeInvoiceScreen';
 import PrintMakeInvoiceScreen from './screens/PrintMakeInvoiceScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import SettingsScreen from './screens/SettingsScreen';
-import ConversationListScreen from './screens/ConversationListScreen';
-import ChatScreen from './screens/ChatScreen';
-import NewConversationScreen from './screens/NewConversationScreen';
+import MessengerScreen from './screens/MessengerScreen';
 
 // Types
 import CreateProduct from 'components/CreateProduct';
@@ -131,18 +129,8 @@ const AppNavigator = () => {
           />
           <Stack.Screen name="Settings" component={SettingsScreen} />
           <Stack.Screen 
-            name="ConversationList" 
-            component={ConversationListScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="ChatScreen" 
-            component={ChatScreen}
-            options={{ headerShown: false }}
-          />
-          <Stack.Screen 
-            name="NewConversationScreen" 
-            component={NewConversationScreen}
+            name="Messenger" 
+            component={MessengerScreen}
             options={{ headerShown: false }}
           />
         </>

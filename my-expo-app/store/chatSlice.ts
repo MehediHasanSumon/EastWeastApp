@@ -1,17 +1,22 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { ChatState, ChatConversation, ChatMessage, TypingUser, SocketMessage } from '../types/chat';
+import { IChatState, IConversation, IMessage, IUser, ISocketMessage, ITypingData } from '../types/chat';
 import { chatApiService } from '../utils/chatApi';
-import { chatSocketService } from '../utils/chatSocket';
 
-const initialState: ChatState = {
+const initialState: IChatState = {
   conversations: [],
   currentConversation: null,
-  messages: {},
-  typingUsers: {},
-  onlineUsers: [],
-  isLoading: false,
+  messages: [],
+  typingUsers: [],
+  loading: false,
   error: null,
   isConnected: false,
+  selectedUsers: [],
+  searchResults: [],
+  pagination: {
+    page: 1,
+    limit: 20,
+    hasMore: true,
+  },
 };
 
 // Async thunks
@@ -19,50 +24,78 @@ export const fetchConversations = createAsyncThunk(
   'chat/fetchConversations',
   async (_, { rejectWithValue }) => {
     try {
-      const conversations = await chatApiService.getConversations();
-      return conversations;
+      const response = await chatApiService.getConversations();
+      if (response.success) {
+        return response.data;
+      } else {
+        return rejectWithValue('Failed to fetch conversations');
+      }
     } catch (error: any) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error.message || 'Failed to fetch conversations');
     }
   }
 );
 
 export const fetchMessages = createAsyncThunk(
   'chat/fetchMessages',
-  async ({ conversationId, page = 1 }: { conversationId: string; page?: number }, { rejectWithValue }) => {
+  async ({ conversationId, page = 1, limit = 20 }: { conversationId: string; page?: number; limit?: number }, { rejectWithValue }) => {
     try {
-      const result = await chatApiService.getMessages(conversationId, page);
-      return { conversationId, ...result };
+      const response = await chatApiService.getMessages(conversationId, page, limit);
+      if (response.success) {
+        return response.data;
+      } else {
+        return rejectWithValue('Failed to fetch messages');
+      }
     } catch (error: any) {
-      return rejectWithValue(error.message);
-    }
-  }
-);
-
-export const createConversation = createAsyncThunk(
-  'chat/createConversation',
-  async ({ participantIds, type, name }: { participantIds: string[]; type: 'direct' | 'group'; name?: string }, { rejectWithValue }) => {
-    try {
-      const conversation = await chatApiService.createConversation(participantIds, type, name);
-      return conversation;
-    } catch (error: any) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error.message || 'Failed to fetch messages');
     }
   }
 );
 
 export const sendMessage = createAsyncThunk(
   'chat/sendMessage',
-  async (messageData: SocketMessage, { rejectWithValue, getState }) => {
+  async (messageData: ISocketMessage, { rejectWithValue }) => {
     try {
-      const result = await chatSocketService.sendMessage(messageData);
-      if (result.success && result.message) {
-        return result.message;
+      const response = await chatApiService.sendMessage(messageData);
+      if (response.success) {
+        return response.data;
       } else {
-        return rejectWithValue(result.error || 'Failed to send message');
+        return rejectWithValue('Failed to send message');
       }
     } catch (error: any) {
-      return rejectWithValue(error.message);
+      return rejectWithValue(error.message || 'Failed to send message');
+    }
+  }
+);
+
+export const createConversation = createAsyncThunk(
+  'chat/createConversation',
+  async (conversationData: { participants: string[]; type: 'direct' | 'group'; name?: string }, { rejectWithValue }) => {
+    try {
+      const response = await chatApiService.createConversation(conversationData);
+      if (response.success) {
+        return response.data;
+      } else {
+        return rejectWithValue('Failed to create conversation');
+      }
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to create conversation');
+    }
+  }
+);
+
+export const searchUsers = createAsyncThunk(
+  'chat/searchUsers',
+  async (query: string, { rejectWithValue }) => {
+    try {
+      const response = await chatApiService.searchUsers(query);
+      if (response.success) {
+        return response.data;
+      } else {
+        return rejectWithValue('Failed to search users');
+      }
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to search users');
     }
   }
 );
@@ -71,167 +104,235 @@ const chatSlice = createSlice({
   name: 'chat',
   initialState,
   reducers: {
-    setCurrentConversation: (state, action: PayloadAction<ChatConversation | null>) => {
+    setCurrentConversation: (state, action: PayloadAction<IConversation | null>) => {
       state.currentConversation = action.payload;
+      if (action.payload) {
+        // Reset messages when switching conversations
+        state.messages = [];
+        state.pagination.page = 1;
+        state.pagination.hasMore = true;
+      }
     },
     
-    addMessage: (state, action: PayloadAction<ChatMessage>) => {
+    addMessage: (state, action: PayloadAction<IMessage>) => {
       const message = action.payload;
-      const conversationId = message.conversationId;
       
-      if (!state.messages[conversationId]) {
-        state.messages[conversationId] = [];
-      }
-      
-      // Check if message already exists
-      const existingIndex = state.messages[conversationId].findIndex(m => m._id === message._id);
-      if (existingIndex === -1) {
-        state.messages[conversationId].push(message);
-        // Sort by creation time
-        state.messages[conversationId].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      // Add message to current conversation if it matches
+      if (state.currentConversation?._id === message.conversationId) {
+        state.messages.push(message);
       }
       
       // Update conversation's last message
-      const conversationIndex = state.conversations.findIndex(c => c._id === conversationId);
+      const conversationIndex = state.conversations.findIndex(c => c._id === message.conversationId);
       if (conversationIndex !== -1) {
         state.conversations[conversationIndex].lastMessage = message;
-        state.conversations[conversationIndex].lastMessageTime = message.createdAt;
+        state.conversations[conversationIndex].updatedAt = new Date();
+        
+        // Move conversation to top
+        const conversation = state.conversations.splice(conversationIndex, 1)[0];
+        state.conversations.unshift(conversation);
       }
     },
     
-    updateMessage: (state, action: PayloadAction<{ messageId: string; conversationId: string; updates: Partial<ChatMessage> }>) => {
-      const { messageId, conversationId, updates } = action.payload;
-      const messages = state.messages[conversationId];
-      if (messages) {
-        const messageIndex = messages.findIndex(m => m._id === messageId);
-        if (messageIndex !== -1) {
-          messages[messageIndex] = { ...messages[messageIndex], ...updates };
+    updateMessage: (state, action: PayloadAction<{ messageId: string; updates: Partial<IMessage> }>) => {
+      const { messageId, updates } = action.payload;
+      
+      // Update message in messages array
+      const messageIndex = state.messages.findIndex(m => m._id === messageId);
+      if (messageIndex !== -1) {
+        state.messages[messageIndex] = { ...state.messages[messageIndex], ...updates };
+      }
+      
+      // Update message in conversation's last message if it's the last message
+      state.conversations.forEach(conversation => {
+        if (conversation.lastMessage?._id === messageId) {
+          conversation.lastMessage = { ...conversation.lastMessage, ...updates };
         }
-      }
+      });
     },
     
-    removeMessage: (state, action: PayloadAction<{ messageId: string; conversationId: string }>) => {
-      const { messageId, conversationId } = action.payload;
-      const messages = state.messages[conversationId];
-      if (messages) {
-        state.messages[conversationId] = messages.filter(m => m._id !== messageId);
-      }
+    deleteMessage: (state, action: PayloadAction<string>) => {
+      const messageId = action.payload;
+      
+      // Remove message from messages array
+      state.messages = state.messages.filter(m => m._id !== messageId);
+      
+      // Update conversation's last message if needed
+      state.conversations.forEach(conversation => {
+        if (conversation.lastMessage?._id === messageId) {
+          // Find the next most recent message
+          const nextMessage = state.messages
+            .filter(m => m.conversationId === conversation._id)
+            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+          
+          conversation.lastMessage = nextMessage;
+        }
+      });
     },
     
-    setTypingUser: (state, action: PayloadAction<TypingUser>) => {
+    setTypingUser: (state, action: PayloadAction<ITypingData>) => {
       const { conversationId, userId, isTyping } = action.payload;
       
-      if (!state.typingUsers[conversationId]) {
-        state.typingUsers[conversationId] = [];
-      }
-      
-      if (isTyping) {
-        // Add or update typing user
-        const existingIndex = state.typingUsers[conversationId].findIndex(u => u.userId === userId);
-        if (existingIndex === -1) {
-          state.typingUsers[conversationId].push(action.payload);
+      if (state.currentConversation?._id === conversationId) {
+        if (isTyping) {
+          if (!state.typingUsers.includes(userId)) {
+            state.typingUsers.push(userId);
+          }
         } else {
-          state.typingUsers[conversationId][existingIndex] = action.payload;
+          state.typingUsers = state.typingUsers.filter(id => id !== userId);
         }
-      } else {
-        // Remove typing user
-        state.typingUsers[conversationId] = state.typingUsers[conversationId].filter(u => u.userId !== userId);
       }
-    },
-    
-    setOnlineUsers: (state, action: PayloadAction<string[]>) => {
-      state.onlineUsers = action.payload;
-    },
-    
-    addOnlineUser: (state, action: PayloadAction<string>) => {
-      if (!state.onlineUsers.includes(action.payload)) {
-        state.onlineUsers.push(action.payload);
-      }
-    },
-    
-    removeOnlineUser: (state, action: PayloadAction<string>) => {
-      state.onlineUsers = state.onlineUsers.filter(id => id !== action.payload);
     },
     
     setConnectionStatus: (state, action: PayloadAction<boolean>) => {
       state.isConnected = action.payload;
     },
     
-    updateConversation: (state, action: PayloadAction<ChatConversation>) => {
-      const conversationIndex = state.conversations.findIndex(c => c._id === action.payload._id);
-      if (conversationIndex !== -1) {
-        state.conversations[conversationIndex] = action.payload;
-      } else {
-        state.conversations.unshift(action.payload);
+    addSelectedUser: (state, action: PayloadAction<IUser>) => {
+      if (!state.selectedUsers.find(u => u._id === action.payload._id)) {
+        state.selectedUsers.push(action.payload);
       }
     },
     
-    removeConversation: (state, action: PayloadAction<string>) => {
-      state.conversations = state.conversations.filter(c => c._id !== action.payload);
-      delete state.messages[action.payload];
-      delete state.typingUsers[action.payload];
+    removeSelectedUser: (state, action: PayloadAction<string>) => {
+      state.selectedUsers = state.selectedUsers.filter(u => u._id !== action.payload);
+    },
+    
+    clearSelectedUsers: (state) => {
+      state.selectedUsers = [];
+    },
+    
+    setSearchResults: (state, action: PayloadAction<IUser[]>) => {
+      state.searchResults = action.payload;
     },
     
     clearError: (state) => {
       state.error = null;
     },
     
-    clearMessages: (state, action: PayloadAction<string>) => {
-      state.messages[action.payload] = [];
+    updateConversation: (state, action: PayloadAction<IConversation>) => {
+      const updatedConversation = action.payload;
+      const index = state.conversations.findIndex(c => c._id === updatedConversation._id);
+      
+      if (index !== -1) {
+        state.conversations[index] = updatedConversation;
+        
+        // Update current conversation if it's the same one
+        if (state.currentConversation?._id === updatedConversation._id) {
+          state.currentConversation = updatedConversation;
+        }
+      }
+    },
+    
+    markConversationAsRead: (state, action: PayloadAction<string>) => {
+      const conversationId = action.payload;
+      const conversation = state.conversations.find(c => c._id === conversationId);
+      
+      if (conversation) {
+        // Reset unread count for current user
+        // TODO: Get current user ID from auth state
+        const currentUserId = 'currentUser'; // This should come from auth state
+        conversation.unreadCount[currentUserId] = 0;
+      }
+    },
+
+    addMessageReaction: (state, action: PayloadAction<{
+      messageId: string;
+      reactionType: string;
+      emoji: string;
+      userId: string;
+      userName: string;
+    }>) => {
+      const { messageId, reactionType, emoji, userId, userName } = action.payload;
+      
+      // Add reaction to message in messages array
+      const messageIndex = state.messages.findIndex(m => m._id === messageId);
+      if (messageIndex !== -1) {
+        if (!state.messages[messageIndex].reactions) {
+          state.messages[messageIndex].reactions = [];
+        }
+        
+        // Check if user already reacted with this type
+        const existingReactionIndex = state.messages[messageIndex].reactions!.findIndex(
+          r => r.userId === userId && r.type === reactionType
+        );
+        
+        if (existingReactionIndex !== -1) {
+          // Update existing reaction
+          state.messages[messageIndex].reactions![existingReactionIndex].emoji = emoji;
+        } else {
+          // Add new reaction
+          state.messages[messageIndex].reactions!.push({
+            type: reactionType,
+            emoji,
+            userId,
+            userName,
+          });
+        }
+      }
+    },
+    
+    resetChatState: (state) => {
+      return initialState;
     },
   },
+  
   extraReducers: (builder) => {
     builder
       // Fetch conversations
       .addCase(fetchConversations.pending, (state) => {
-        state.isLoading = true;
+        state.loading = true;
         state.error = null;
       })
       .addCase(fetchConversations.fulfilled, (state, action) => {
-        state.isLoading = false;
+        state.loading = false;
         state.conversations = action.payload;
       })
       .addCase(fetchConversations.rejected, (state, action) => {
-        state.isLoading = false;
+        state.loading = false;
         state.error = action.payload as string;
       })
       
       // Fetch messages
       .addCase(fetchMessages.pending, (state) => {
-        state.isLoading = true;
+        state.loading = true;
         state.error = null;
       })
       .addCase(fetchMessages.fulfilled, (state, action) => {
-        state.isLoading = false;
-        const { conversationId, messages, pagination } = action.payload;
-        
-        if (!state.messages[conversationId]) {
-          state.messages[conversationId] = [];
-        }
-        
-        // If it's the first page, replace messages, otherwise append
-        if (pagination.currentPage === 1) {
-          state.messages[conversationId] = messages;
-        } else {
-          // Prepend older messages
-          state.messages[conversationId] = [...messages, ...state.messages[conversationId]];
+        state.loading = false;
+        if (action.payload.length > 0) {
+          state.messages = action.payload;
         }
       })
       .addCase(fetchMessages.rejected, (state, action) => {
-        state.isLoading = false;
+        state.loading = false;
+        state.error = action.payload as string;
+      })
+      
+      // Send message
+      .addCase(sendMessage.fulfilled, (state, action) => {
+        // Message is already added via socket or API response
+        // This is just for optimistic updates
+      })
+      .addCase(sendMessage.rejected, (state, action) => {
         state.error = action.payload as string;
       })
       
       // Create conversation
       .addCase(createConversation.fulfilled, (state, action) => {
         state.conversations.unshift(action.payload);
+        state.currentConversation = action.payload;
+        state.selectedUsers = [];
+      })
+      .addCase(createConversation.rejected, (state, action) => {
+        state.error = action.payload as string;
       })
       
-      // Send message
-      .addCase(sendMessage.fulfilled, (state, action) => {
-        // Message is already added via socket event
+      // Search users
+      .addCase(searchUsers.fulfilled, (state, action) => {
+        state.searchResults = action.payload;
       })
-      .addCase(sendMessage.rejected, (state, action) => {
+      .addCase(searchUsers.rejected, (state, action) => {
         state.error = action.payload as string;
       });
   },
@@ -241,16 +342,18 @@ export const {
   setCurrentConversation,
   addMessage,
   updateMessage,
-  removeMessage,
+  deleteMessage,
   setTypingUser,
-  setOnlineUsers,
-  addOnlineUser,
-  removeOnlineUser,
   setConnectionStatus,
-  updateConversation,
-  removeConversation,
+  addSelectedUser,
+  removeSelectedUser,
+  clearSelectedUsers,
+  setSearchResults,
   clearError,
-  clearMessages,
+  updateConversation,
+  markConversationAsRead,
+  addMessageReaction,
+  resetChatState,
 } = chatSlice.actions;
 
 export default chatSlice.reducer;

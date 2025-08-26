@@ -25,7 +25,7 @@ const dashboardItems: DashboardItem[] = [
   { title: 'Employee', route: 'Employee', icon: require('../assets/employee.png') },
   { title: 'Make Invoice', route: 'MakeInvoice', icon: require('../assets/invoice.png') },
   { title: 'General Settings', route: 'Settings', icon: require('../assets/settings.png') },
-  { title: 'Messages', route: 'ConversationList', icon: require('../assets/convartion.png') },
+  { title: 'Messages', route: 'Messenger', icon: require('../assets/convartion.png') },
 ];
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Dashboard'>;
@@ -54,11 +54,7 @@ const DashboardScreen = ({ navigation }: Props) => {
               borderColor: theme.mode === 'dark' ? '#555' : '#ccc',
             }}
             onPress={() => {
-              if (item.route === 'Messages') {
-                navigation.navigate('Messages', {});
-              } else {
-                navigation.navigate(item.route, undefined);
-              }
+              navigation.navigate(item.route, undefined);
             }}>
             <Image source={item.icon} className="mb-2 h-16 w-16" resizeMode="contain" />
             <Text
