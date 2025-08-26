@@ -127,3 +127,41 @@ export interface ChatApiResponse<T> {
     hasMore: boolean;
   };
 }
+
+// Call-related types
+export type CallType = 'audio' | 'video';
+
+export interface CallInvite {
+  conversationId: string;
+  fromUserId: string;
+  callType: CallType;
+  at: string;
+}
+
+export interface CallSignal {
+  type: 'sdp' | 'ice';
+  sdp?: RTCSessionDescriptionInit;
+  candidate?: RTCIceCandidateInit;
+}
+
+export interface CallState {
+  isIncoming: boolean;
+  isOutgoing: boolean;
+  isActive: boolean;
+  isConnecting: boolean;
+  isMuted: boolean;
+  isVideoOff: boolean;
+  callType: CallType;
+  conversationId: string;
+  remoteUserId: string;
+  remoteUserName: string;
+  duration: number;
+  startTime?: Date;
+}
+
+export interface CallAction {
+  type: 'invite' | 'accept' | 'reject' | 'cancel' | 'end';
+  conversationId: string;
+  callType?: CallType;
+  reason?: string;
+}

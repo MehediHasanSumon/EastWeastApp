@@ -91,7 +91,7 @@ app.use("/", apiRoutes);
 app.use("/api/", authRoutes);
 app.use("/api/chat/", chatRoutes);
 app.use("/api/admin/", isLoggedIn, adminRoute);
-app.use("/api/admin/roles/", isLoggedIn, roleRoutes);
+app.use("/api/admin/", isLoggedIn, roleRoutes);
 
 // Test endpoint
 app.get("/api/test", (req, res) => {

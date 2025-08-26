@@ -36,6 +36,8 @@ import { getCookie } from "./utils/Storage";
 import GlobalCallManager from "./components/Chat/GlobalCallManager";
 import GlobalMessageNotifier from "./components/Chat/GlobalMessageNotifier";
 import ReportManagement from "./pages/Admin/Report/ReportManagement";
+import Settings from "./pages/Admin/Settings/Settings";
+import SMSSetting from "./pages/Admin/Settings/SMSSetting";
 
 const App = () => {
   return (
@@ -99,6 +101,9 @@ const AppRoutes = () => {
         <Route path="products" element={<ProductManagement />} />
         <Route path="invoices" element={<InvoiceManagement />} />
         <Route path="reports" element={<ReportManagement />} />
+
+        <Route path="settings" element={<Settings />} />
+        <Route path="sms-settings" element={<SMSSetting />} />
 
         <Route path="account-settings" element={<ProfileInformation />} />
         <Route path="email-settings" element={<AccountEmailSettings />} />

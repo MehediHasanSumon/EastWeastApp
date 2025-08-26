@@ -109,24 +109,7 @@ const ReportManagement = () => {
     }));
   }, []);
 
-  // Test function to check API access
-  const testApiAccess = async () => {
-    try {
-      console.log('Testing API access...');
-      const res = await request.get("/api/admin/test");
-      console.log('Test API response:', res.data);
-      if (res.data.status) {
-        toastSuccess(`API access working. User: ${res.data.user?.name || 'Unknown'}`);
-      }
-    } catch (error: any) {
-      console.error('Test API error:', error);
-      if (error.response?.status === 401) {
-        toastError("Authentication failed");
-      } else {
-        toastError("API test failed");
-      }
-    }
-  };
+
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -145,19 +128,14 @@ const ReportManagement = () => {
         maxAmount: filters.maxAmount || undefined,
       };
       
-      console.log('Fetching invoices with params:', params);
-      
       // Check if token is available
       const token = localStorage.getItem('rt') || document.cookie.split('; ').find(row => row.startsWith('rt='))?.split('=')[1];
-      console.log('Token available:', !!token);
       
       const res = await request.get("/api/admin/reports/detailed", { params });
-      console.log('API response:', res.data);
       
       if (res.data.status && res.data.invoices) {
         setTableData(res.data.invoices);
         setMeta(res.data.meta);
-        console.log('Invoices fetched successfully:', res.data.invoices.length);
       } else {
         console.error("Invalid response structure:", res.data);
         toastError("Invalid response from server");
@@ -190,13 +168,10 @@ const ReportManagement = () => {
         payment_method: filters.payment_method || undefined,
       };
       
-      console.log('Fetching stats with params:', params);
       const res = await request.get("/api/admin/reports/stats", { params });
-      console.log('Stats API response:', res.data);
       
       if (res.data.status && res.data.totalInvoices !== undefined) {
         setStats(res.data);
-        console.log('Stats fetched successfully:', res.data);
       } else {
         console.error("Invalid stats response structure:", res.data);
         setStats(null);
@@ -290,7 +265,7 @@ const ReportManagement = () => {
     };
     
     setFilters(newFilters);
-    console.log('Date range changed:', range, 'Filters:', newFilters);
+    
   };
 
   const handleExport = async () => {
@@ -580,9 +555,7 @@ const ReportManagement = () => {
           subtitle="Comprehensive invoice analytics and reporting"
           actions={
             <div className="flex space-x-2">
-              <Button variant="light" onClick={testApiAccess}>
-                Test API
-              </Button>
+
               <Button variant="light" onClick={() => openModal("filter")}>
                 <FiFilter className="mr-2" />
                 Advanced Filter
@@ -605,7 +578,7 @@ const ReportManagement = () => {
         />
 
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden">
-          {console.log('Table data:', tableData)}
+
           <Table
             columns={getColumns()}
             data={tableData || []}

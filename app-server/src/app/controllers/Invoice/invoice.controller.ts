@@ -3,6 +3,9 @@ import { Types } from "mongoose";
 import Invoice from "../../models/Invoice";
 import Product from "../../models/Product";
 import User from "../../models/Users";
+import { SMSTemplate } from "../../models/Settings";
+import { formatSms } from "../../../utils/sms";
+import { sendSMS } from "../../../config/SmsConfig";
 
 export const createInvoice = async (req: Request, res: Response): Promise<Response | any> => {
   try {
@@ -18,7 +21,7 @@ export const createInvoice = async (req: Request, res: Response): Promise<Respon
       quantity,
       total_amount,
       discount,
-      is_sent_sms
+      is_sent_sms,
     } = req.body;
 
     // Validation
@@ -40,14 +43,14 @@ export const createInvoice = async (req: Request, res: Response): Promise<Respon
     let parsedDate;
     try {
       // Handle both ISO string and custom format
-      if (typeof date_time === 'string' && date_time.includes('T')) {
+      if (typeof date_time === "string" && date_time.includes("T")) {
         parsedDate = new Date(date_time);
-      } else if (typeof date_time === 'string') {
+      } else if (typeof date_time === "string") {
         // Parse custom format: "YYYY-MM-DD HH:MM"
-        const [datePart, timePart] = date_time.split(' ');
+        const [datePart, timePart] = date_time.split(" ");
         if (datePart && timePart) {
-          const [year, month, day] = datePart.split('-');
-          const [hour, minute] = timePart.split(':');
+          const [year, month, day] = datePart.split("-");
+          const [hour, minute] = timePart.split(":");
           parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute));
         } else {
           parsedDate = new Date(date_time);
@@ -55,9 +58,9 @@ export const createInvoice = async (req: Request, res: Response): Promise<Respon
       } else {
         parsedDate = new Date(date_time);
       }
-      
+
       if (isNaN(parsedDate.getTime())) {
-        throw new Error('Invalid date format');
+        throw new Error("Invalid date format");
       }
     } catch (dateError) {
       return res.status(400).send({
@@ -151,36 +154,44 @@ export const createInvoice = async (req: Request, res: Response): Promise<Respon
       });
     }
 
-    // Validate total amount calculation
-    const calculatedTotal = (price * quantity) - (discount || 0);
-    if (Math.abs(total_amount - calculatedTotal) > 0.01) {
+    let newInvoice;
+    try {
+      newInvoice = await Invoice.create({
+        invoice_no: invoice_no.trim(),
+        date_time: parsedDate,
+        vehicle_no: vehicle_no?.trim() || null,
+        customer_name: customer_name.trim(),
+        customer_phone_number: customer_phone_number.trim(),
+        payment_method,
+        product,
+        seller,
+        price,
+        quantity,
+        total_amount,
+        discount: discount || 0,
+        is_sent_sms: is_sent_sms || false,
+      });
+    } catch (createError: any) {
       return res.status(400).send({
         status: false,
-        message: `Total amount must equal price (${price}) × quantity (${quantity}) - discount (${discount || 0}) = ${calculatedTotal}`,
+        message: createError.message || "Failed to create invoice due to validation error",
       });
     }
 
-    const newInvoice = await Invoice.create({
-      invoice_no: invoice_no.trim(),
-      date_time: parsedDate,
-      vehicle_no: vehicle_no?.trim() || null,
-      customer_name: customer_name.trim(),
-      customer_phone_number: customer_phone_number.trim(),
-      payment_method,
-      product,
-      seller,
-      price,
-      quantity,
-      total_amount,
-      discount: discount || 0,
-      is_sent_sms: is_sent_sms || false
-    });
-
     // Populate references for response
     await newInvoice.populate([
-      { path: 'product', select: 'name purchases sell' },
-      { path: 'seller', select: 'name email' }
+      { path: "product", select: "name purchases sell" },
+      { path: "seller", select: "name email" },
     ]);
+
+    if (is_sent_sms == true) {
+      const smsTemplate = await SMSTemplate.findOne({ isActive: true }).sort({ createdAt: -1 }).exec();
+      console.log(smsTemplate);
+      if (smsTemplate && smsTemplate.body) {
+        const message = formatSms(smsTemplate.body, newInvoice);
+        await sendSMS(customer_phone_number, message);
+      }
+    }
 
     return res.status(201).send({
       status: true,
@@ -214,7 +225,7 @@ export const getAllInvoices = async (req: Request, res: Response): Promise<Respo
         { invoice_no: { $regex: search.trim(), $options: "i" } },
         { customer_name: { $regex: search.trim(), $options: "i" } },
         { customer_phone_number: { $regex: search.trim(), $options: "i" } },
-        { vehicle_no: { $regex: search.trim(), $options: "i" } }
+        { vehicle_no: { $regex: search.trim(), $options: "i" } },
       ];
     }
 
@@ -230,7 +241,7 @@ export const getAllInvoices = async (req: Request, res: Response): Promise<Respo
         query.date_time.$gte = new Date(startDate);
       }
       if (endDate) {
-        query.date_time.$lte = new Date(endDate + 'T23:59:59.999Z');
+        query.date_time.$lte = new Date(endDate + "T23:59:59.999Z");
       }
     }
 
@@ -277,8 +288,8 @@ export const getAllInvoices = async (req: Request, res: Response): Promise<Respo
 
     const invoices = await Invoice.find(query)
       .populate([
-        { path: 'product', select: 'name purchases sell' },
-        { path: 'seller', select: 'name email' }
+        { path: "product", select: "name purchases sell" },
+        { path: "seller", select: "name email" },
       ])
       .sort(sortObj)
       .skip((page - 1) * perPage)
@@ -324,8 +335,8 @@ export const getInvoiceById = async (req: Request, res: Response): Promise<Respo
     }
 
     const invoice = await Invoice.findById(id).populate([
-      { path: 'product', select: 'name purchases sell' },
-      { path: 'seller', select: 'name email' }
+      { path: "product", select: "name purchases sell" },
+      { path: "seller", select: "name email" },
     ]);
 
     if (!invoice) {
@@ -363,7 +374,7 @@ export const updateInvoice = async (req: Request, res: Response): Promise<Respon
       quantity,
       total_amount,
       discount,
-      is_sent_sms
+      is_sent_sms,
     } = req.body;
 
     if (!Types.ObjectId.isValid(id)) {
@@ -398,14 +409,14 @@ export const updateInvoice = async (req: Request, res: Response): Promise<Respon
       let parsedDate;
       try {
         // Handle both ISO string and custom format
-        if (typeof date_time === 'string' && date_time.includes('T')) {
+        if (typeof date_time === "string" && date_time.includes("T")) {
           parsedDate = new Date(date_time);
-        } else if (typeof date_time === 'string') {
+        } else if (typeof date_time === "string") {
           // Parse custom format: "YYYY-MM-DD HH:MM"
-          const [datePart, timePart] = date_time.split(' ');
+          const [datePart, timePart] = date_time.split(" ");
           if (datePart && timePart) {
-            const [year, month, day] = datePart.split('-');
-            const [hour, minute] = timePart.split(':');
+            const [year, month, day] = datePart.split("-");
+            const [hour, minute] = timePart.split(":");
             parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute));
           } else {
             parsedDate = new Date(date_time);
@@ -413,11 +424,11 @@ export const updateInvoice = async (req: Request, res: Response): Promise<Respon
         } else {
           parsedDate = new Date(date_time);
         }
-        
+
         if (isNaN(parsedDate.getTime())) {
-          throw new Error('Invalid date format');
+          throw new Error("Invalid date format");
         }
-        
+
         invoice.date_time = parsedDate;
       } catch (dateError) {
         return res.status(400).send({
@@ -473,12 +484,12 @@ export const updateInvoice = async (req: Request, res: Response): Promise<Respon
 
     // Recalculate total amount if price, quantity, or discount changed
     if (price !== undefined || quantity !== undefined || discount !== undefined) {
-      invoice.total_amount = (invoice.price * invoice.quantity) - invoice.discount;
+      invoice.total_amount = invoice.price * invoice.quantity - invoice.discount;
     }
 
     // Validate total amount
     if (total_amount !== undefined) {
-      const calculatedTotal = (invoice.price * invoice.quantity) - invoice.discount;
+      const calculatedTotal = invoice.price * invoice.quantity - invoice.discount;
       if (Math.abs(total_amount - calculatedTotal) > 0.01) {
         return res.status(400).send({
           status: false,
@@ -492,8 +503,8 @@ export const updateInvoice = async (req: Request, res: Response): Promise<Respon
 
     // Populate references for response
     await invoice.populate([
-      { path: 'product', select: 'name purchases sell' },
-      { path: 'seller', select: 'name email' }
+      { path: "product", select: "name purchases sell" },
+      { path: "seller", select: "name email" },
     ]);
 
     return res.status(200).send({
@@ -533,9 +544,10 @@ export const deleteInvoices = async (req: Request, res: Response): Promise<Respo
 
     return res.status(200).json({
       status: true,
-      message: result.deletedCount === 1 
-        ? "1 invoice deleted successfully." 
-        : `${result.deletedCount} invoices deleted successfully.`,
+      message:
+        result.deletedCount === 1
+          ? "1 invoice deleted successfully."
+          : `${result.deletedCount} invoices deleted successfully.`,
     });
   } catch (error) {
     console.error("Error deleting invoices:", error);
@@ -545,8 +557,6 @@ export const deleteInvoices = async (req: Request, res: Response): Promise<Respo
     });
   }
 };
-
-
 
 export const exportInvoices = async (req: Request, res: Response): Promise<Response | any> => {
   try {
@@ -560,7 +570,7 @@ export const exportInvoices = async (req: Request, res: Response): Promise<Respo
         { invoice_no: { $regex: search.toString().trim(), $options: "i" } },
         { customer_name: { $regex: search.toString().trim(), $options: "i" } },
         { customer_phone_number: { $regex: search.toString().trim(), $options: "i" } },
-        { vehicle_no: { $regex: search.toString().trim(), $options: "i" } }
+        { vehicle_no: { $regex: search.toString().trim(), $options: "i" } },
       ];
     }
 
@@ -574,7 +584,7 @@ export const exportInvoices = async (req: Request, res: Response): Promise<Respo
         query.date_time.$gte = new Date(startDate.toString());
       }
       if (endDate) {
-        query.date_time.$lte = new Date(endDate.toString() + 'T23:59:59.999Z');
+        query.date_time.$lte = new Date(endDate.toString() + "T23:59:59.999Z");
       }
     }
 
@@ -601,61 +611,65 @@ export const exportInvoices = async (req: Request, res: Response): Promise<Respo
 
     const invoices = await Invoice.find(query)
       .populate([
-        { path: 'product', select: 'name' },
-        { path: 'seller', select: 'name email' }
+        { path: "product", select: "name" },
+        { path: "seller", select: "name email" },
       ])
       .sort(sortObj)
       .lean();
 
     // Convert to CSV format
     const csvHeaders = [
-      'Invoice Number',
-      'Date & Time',
-      'Vehicle Number',
-      'Customer Name',
-      'Customer Phone',
-      'Payment Method',
-      'Product',
-      'Seller',
-      'Price',
-      'Quantity',
-      'Total Amount',
-      'Discount',
-      'SMS Sent',
-      'Created At'
+      "Invoice Number",
+      "Date & Time",
+      "Vehicle Number",
+      "Customer Name",
+      "Customer Phone",
+      "Payment Method",
+      "Product",
+      "Seller",
+      "Price",
+      "Quantity",
+      "Total Amount",
+      "Discount",
+      "SMS Sent",
+      "Created At",
     ];
 
-    const csvRows = invoices.map(invoice => [
+    const csvRows = invoices.map((invoice) => [
       invoice.invoice_no,
       new Date(invoice.date_time).toLocaleString(),
-      invoice.vehicle_no || '',
+      invoice.vehicle_no || "",
       invoice.customer_name,
       invoice.customer_phone_number,
       invoice.payment_method,
-      (invoice.product as any)?.name || '',
-      (invoice.seller as any)?.name || '',
+      (invoice.product as any)?.name || "",
+      (invoice.seller as any)?.name || "",
       invoice.price,
       invoice.quantity,
       invoice.total_amount,
       invoice.discount,
-      invoice.is_sent_sms ? 'Yes' : 'No',
-      invoice.createdAt ? new Date(invoice.createdAt).toLocaleString() : ''
+      invoice.is_sent_sms ? "Yes" : "No",
+      invoice.createdAt ? new Date(invoice.createdAt).toLocaleString() : "",
     ]);
 
     const csvContent = [csvHeaders, ...csvRows]
-      .map(row => row.map(field => {
-        // Handle fields that might contain commas or quotes
-        const fieldStr = String(field || '');
-        if (fieldStr.includes(',') || fieldStr.includes('"') || fieldStr.includes('\n')) {
-          return `"${fieldStr.replace(/"/g, '""')}"`;
-        }
-        return fieldStr;
-      }).join(','))
-      .join('\n');
+      .map((row) =>
+        row
+          .map((field) => {
+            // Handle fields that might contain commas or quotes
+            const fieldStr = String(field || "");
+            if (fieldStr.includes(",") || fieldStr.includes('"') || fieldStr.includes("\n")) {
+              return `"${fieldStr.replace(/"/g, '""')}"`;
+            }
+            return fieldStr;
+          })
+          .join(",")
+      )
+      .join("\n");
 
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', `attachment; filename=invoices-${new Date().toISOString().split('T')[0]}.csv`);
-    
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename=invoices-${new Date().toISOString().split("T")[0]}.csv`);
+
     return res.status(200).send(csvContent);
   } catch (error) {
     console.error("Error exporting invoices:", error);

@@ -37,11 +37,11 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  
+
   // Auto-calculation states
   const [autoCalculate, setAutoCalculate] = useState(true);
   const [totalAmount, setTotalAmount] = useState('0.00');
-  const [profitMargin, setProfitMargin] = useState('0.00');
+
 
   // Load products on mount
   useEffect(() => {
@@ -73,7 +73,7 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
           status: 'true', // Only active products
         },
       });
-      
+
       if (response.data.status && response.data.products) {
         setProducts(response.data.products);
       } else {
@@ -99,8 +99,10 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
 
   // Auto-calculate total when price, quantity, or discount changes
   useEffect(() => {
-    calculateTotal();
-  }, [price, quantity, discount]);
+    if (autoCalculate) {
+      calculateTotal();
+    }
+  }, [price, quantity, discount, autoCalculate]);
 
   const calculateTotal = () => {
     const priceNum = parseFloat(price) || 0;
@@ -110,14 +112,6 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
     // Use Math.round to avoid floating point precision issues
     const total = Math.round((priceNum * quantityNum - discountNum) * 100) / 100;
     setTotalAmount(total.toFixed(2));
-    
-    // Calculate profit margin if product is selected
-    if (selectedProduct) {
-      const purchasePrice = selectedProduct.purchases;
-      const profit = (priceNum - purchasePrice) * quantityNum;
-      const profitPercentage = purchasePrice > 0 ? (profit / (purchasePrice * quantityNum)) * 100 : 0;
-      setProfitMargin(profitPercentage.toFixed(2));
-    }
   };
 
   const handleConfirmDate = (date: Date) => {
@@ -138,11 +132,6 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
     setDiscount('');
     setSmsNotification(false);
     setTotalAmount('0.00');
-    setProfitMargin('0.00');
-  };
-
-  const cleanPhoneNumber = (phone: string) => {
-    return phone.replace(/[\s\-\(\)]/g, '');
   };
 
   const validateForm = () => {
@@ -150,14 +139,14 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
       Alert.alert('Validation Error', 'Invoice number is required');
       return false;
     }
-    
+
     // Validate invoice number format (uppercase letters, numbers, hyphens only)
     const invoiceRegex = /^[A-Z0-9-]+$/;
     if (!invoiceRegex.test(invoiceNo.trim())) {
       Alert.alert('Validation Error', 'Invoice number can only contain uppercase letters, numbers, and hyphens');
       return false;
     }
-    
+
     if (!customerName.trim()) {
       Alert.alert('Validation Error', 'Customer name is required');
       return false;
@@ -166,15 +155,7 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
       Alert.alert('Validation Error', 'Customer mobile number is required');
       return false;
     }
-    
-    // Validate phone number format
-    const phoneRegex = /^[\+]?[1-9][\d]{0,15}$/;
-    const cleanPhone = cleanPhoneNumber(customerMobile);
-    if (!phoneRegex.test(cleanPhone)) {
-      Alert.alert('Validation Error', 'Please enter a valid phone number (e.g., +1234567890 or 1234567890)');
-      return false;
-    }
-    
+
     if (!selectedProductId) {
       Alert.alert('Validation Error', 'Please select a product');
       return false;
@@ -191,28 +172,28 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
       Alert.alert('Validation Error', 'Discount cannot be negative');
       return false;
     }
-    
+
     // Validate vehicle number format if provided
     if (vehicleNo.trim() && !/^[A-Z0-9-]+$/.test(vehicleNo.trim())) {
       Alert.alert('Validation Error', 'Vehicle number can only contain uppercase letters, numbers, and hyphens');
       return false;
     }
-    
+
     // Calculate the correct total amount with precision
     const priceNum = parseFloat(price);
     const quantityNum = parseFloat(quantity);
     const discountNum = parseFloat(discount) || 0;
     const calculatedTotal = Math.round((priceNum * quantityNum - discountNum) * 100) / 100;
-    
+
     // Check if discount is greater than subtotal (before discount)
     if (discountNum > (priceNum * quantityNum)) {
       Alert.alert('Validation Error', 'Discount cannot be greater than subtotal amount');
       return false;
     }
-    
+
     // Always use the calculated total, not the manually entered one
     setTotalAmount(calculatedTotal.toFixed(2));
-    
+
     return true;
   };
 
@@ -242,7 +223,7 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
         date_time: dateTime.toISOString(),
         vehicle_no: vehicleNo.trim() ? vehicleNo.trim().toUpperCase() : null,
         customer_name: customerName.trim(),
-        customer_phone_number: cleanPhoneNumber(customerMobile),
+        customer_phone_number: customerMobile.trim(),
         payment_method: paymentMethod,
         product: selectedProductId,
         price: priceNum,
@@ -270,7 +251,7 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
 
       // Save to backend
       const response = await api.post('/api/admin/create/invoice', formData);
-      
+
       if (response.data.status) {
         // Save current invoiceNo as last used
         await AsyncStorage.setItem('lastInvoiceNo', invoiceNo);
@@ -284,7 +265,7 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
                 dateTime: dateTime.toISOString(),
                 vehicleNo: vehicleNo || '',
                 customerName: customerName,
-                customerMobile: cleanPhoneNumber(customerMobile),
+                customerMobile: customerMobile,
                 paymentMethod: paymentMethod,
                 product: selectedProduct?.name || '',
                 price: price,
@@ -302,7 +283,7 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
     } catch (error: any) {
       console.error('Error creating invoice:', error);
       let errorMessage = 'Failed to create invoice';
-      
+
       if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
         // Log the full error response for debugging
@@ -310,7 +291,7 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       Alert.alert('Error', errorMessage);
     } finally {
       setSubmitting(false);
@@ -460,10 +441,10 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
                 style={{ height: 50 }}>
                 <Picker.Item label="Select a product" value="" />
                 {products.map((product) => (
-                  <Picker.Item 
-                    key={product._id} 
-                    label={`${product.name} - $${product.sell}`} 
-                    value={product._id} 
+                  <Picker.Item
+                    key={product._id}
+                    label={`${product.name} - $${product.sell}`}
+                    value={product._id}
                   />
                 ))}
               </Picker>
@@ -477,9 +458,8 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
             onPress={handleManualCalculation}
             className="flex-row items-center">
             <View
-              className={`h-5 w-5 rounded border-2 border-indigo-600 ${
-                autoCalculate ? 'bg-indigo-600' : 'bg-transparent'
-              }`}
+              className={`h-5 w-5 rounded border-2 border-indigo-600 ${autoCalculate ? 'bg-indigo-600' : 'bg-transparent'
+                }`}
             />
             <Text className="ml-2 font-medium text-gray-700">
               Auto-calculate totals
@@ -542,19 +522,6 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
           </View>
         </View>
 
-        {/* Profit Margin Display */}
-        {selectedProduct && (
-          <View className="mb-5">
-            <Text className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-600">
-              Profit Margin
-            </Text>
-            <View className="rounded-xl border-2 border-gray-300 bg-green-50 px-4 py-4">
-              <Text className="text-base font-semibold text-green-700">
-                {profitMargin}% (${((parseFloat(price) || 0) - selectedProduct.purchases) * (parseFloat(quantity) || 0)})
-              </Text>
-            </View>
-          </View>
-        )}
 
         {/* SMS Notification */}
         <View className="mb-5">
@@ -566,9 +533,8 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
               className="flex-row items-center"
               onPress={() => setSmsNotification(true)}>
               <View
-                className={`h-5 w-5 rounded-full border-2 border-indigo-600 ${
-                  smsNotification ? 'bg-indigo-600' : 'bg-transparent'
-                }`}
+                className={`h-5 w-5 rounded-full border-2 border-indigo-600 ${smsNotification ? 'bg-indigo-600' : 'bg-transparent'
+                  }`}
               />
               <Text className="ml-2 font-medium">Yes</Text>
             </TouchableOpacity>
@@ -576,9 +542,8 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
               className="ml-5 flex-row items-center"
               onPress={() => setSmsNotification(false)}>
               <View
-                className={`h-5 w-5 rounded-full border-2 border-indigo-600 ${
-                  !smsNotification ? 'bg-indigo-600' : 'bg-transparent'
-                }`}
+                className={`h-5 w-5 rounded-full border-2 border-indigo-600 ${!smsNotification ? 'bg-indigo-600' : 'bg-transparent'
+                  }`}
               />
               <Text className="ml-2 font-medium">No</Text>
             </TouchableOpacity>

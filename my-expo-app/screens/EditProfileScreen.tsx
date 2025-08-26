@@ -134,9 +134,8 @@ const EditProfileScreen = ({ navigation, route }: { navigation: any; route: any 
           return;
         }
 
-        const mediaType: any = (ImagePicker as any).MediaType?.Images || (ImagePicker as any).MediaTypeOptions?.Images || 'images';
         const result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: mediaType,
+          mediaTypes: 'images',
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.8,

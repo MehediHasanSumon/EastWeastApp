@@ -5,7 +5,6 @@ import Table from "../../../components/Table";
 import Button from "../../../components/ui/Button";
 import DeleteDialog from "../../../components/ui/DeleteDialog";
 import Dialog from "../../../components/ui/Dialog";
-import Form from "../../../components/ui/Form";
 import Pagination from "../../../components/ui/Pagination";
 import TableFilter from "../../../components/ui/TableFilter";
 import TableHeader from "../../../components/ui/TableHeader";
@@ -15,7 +14,7 @@ import request from "../../../service/AxiosInstance";
 import { handleApiError } from "../../../utils/Api";
 import { toastError, toastSuccess } from "../../../utils/Toast";
 import { getColumns } from "./Column";
-import { LucideCalculator } from "lucide-react";
+
 
 interface Product {
   _id: string;
@@ -56,7 +55,6 @@ const InvoiceManagement = () => {
     delete: false,
     view: false,
     filter: false,
-    calculator: false,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [tableData, setTableData] = useState<Invoice[]>([]);
@@ -70,16 +68,8 @@ const InvoiceManagement = () => {
     startDate: "",
     endDate: "",
   });
-  
-  // Auto-calculation states
-  const [autoCalculate, setAutoCalculate] = useState(true);
-  const [formValues, setFormValues] = useState({
-    price: "",
-    quantity: "",
-    discount: "",
-    total_amount: "",
-  });
-  const [selectedProductForCalc, setSelectedProductForCalc] = useState<Product | null>(null);
+
+
 
   const page = parseInt(searchParams.get("page") || "1");
   const perPage = parseInt(searchParams.get("perPage") || "10");
@@ -90,7 +80,7 @@ const InvoiceManagement = () => {
   const fetchProducts = async () => {
     try {
       const res = await request.get("/api/admin/get/products", { params: { perPage: 1000 } });
-      
+
       if (res.data.status && res.data.products) {
         setProducts(res.data.products);
       } else {
@@ -110,18 +100,18 @@ const InvoiceManagement = () => {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const params = { 
-        page, 
-        perPage, 
-        search: searchInput, 
+      const params = {
+        page,
+        perPage,
+        search: searchInput,
         sort,
         payment_method: filters.payment_method || undefined,
         startDate: filters.startDate || undefined,
         endDate: filters.endDate || undefined,
       };
-      
+
       const res = await request.get("/api/admin/get/invoices", { params });
-      
+
       if (res.data.status && res.data.invoices) {
         setTableData(res.data.invoices);
         setMeta(res.data.meta);
@@ -164,6 +154,108 @@ const InvoiceManagement = () => {
     }
   }, [modals.createOrEdit, modals.delete]);
 
+  // Update form values when editing an invoice
+  useEffect(() => {
+    if (selectedInvoice) {
+      setFormValues({
+        price: selectedInvoice.price.toString(),
+        quantity: selectedInvoice.quantity.toString(),
+        discount: selectedInvoice.discount.toString(),
+        total_amount: selectedInvoice.total_amount.toString(),
+      });
+      setSelectedProductId(selectedInvoice.product._id);
+    } else {
+      // Reset form values for new invoice
+      setFormValues({
+        price: "",
+        quantity: "1",
+        discount: "0",
+        total_amount: "",
+      });
+      setSelectedProductId("");
+    }
+  }, [selectedInvoice]);
+
+  // Auto-calculation state
+  const [autoCalculate, setAutoCalculate] = useState(true);
+  const [formValues, setFormValues] = useState({
+    price: "",
+    quantity: "",
+    discount: "",
+    total_amount: "",
+  });
+  const [selectedProductForCalc, setSelectedProductForCalc] = useState<Product | null>(null);
+  const [selectedProductId, setSelectedProductId] = useState<string>("");
+
+  // Watch for product selection changes and auto-fill price
+  useEffect(() => {
+    if (selectedProductId && autoCalculate) {
+      const product = products.find(p => p._id === selectedProductId);
+      if (product) {
+        setSelectedProductForCalc(product);
+        const newFormValues = {
+          price: product.sell.toString(),
+          quantity: formValues.quantity || "1",
+          discount: formValues.discount || "0",
+          total_amount: calculateTotal(product.sell.toString(), formValues.quantity || "1", formValues.discount || "0").toString()
+        };
+        setFormValues(newFormValues);
+      }
+    }
+  }, [selectedProductId, autoCalculate, products]);
+
+  // Watch for form value changes and update selectedProductId
+  useEffect(() => {
+    if (formValues.price && !selectedProductId) {
+      // If price is set but no product is selected, try to find matching product
+      const matchingProduct = products.find(p => p.sell.toString() === formValues.price);
+      if (matchingProduct) {
+        setSelectedProductId(matchingProduct._id);
+        setSelectedProductForCalc(matchingProduct);
+      }
+    }
+  }, [formValues.price, selectedProductId, products]);
+
+  // Debug: Log formValues changes
+  useEffect(() => {
+    console.log('formValues changed:', formValues);
+  }, [formValues]);
+
+  // Watch for product selection and update formValues for Form component
+  useEffect(() => {
+    if (selectedProductId && !selectedInvoice) {
+      // Only update for new invoices, not when editing
+      const product = products.find(p => p._id === selectedProductId);
+      if (product) {
+        const newFormValues = {
+          price: product.sell.toString(),
+          quantity: "1",
+          discount: "0",
+          total_amount: product.sell.toString()
+        };
+        setFormValues(newFormValues);
+      }
+    }
+  }, [selectedProductId, products, selectedInvoice]);
+
+  // Handle product selection change
+  const handleProductChange = (productId: string) => {
+    setSelectedProductId(productId);
+    if (productId && autoCalculate) {
+      const product = products.find(p => p._id === productId);
+      if (product) {
+        setSelectedProductForCalc(product);
+        const newFormValues = {
+          price: product.sell.toString(),
+          quantity: formValues.quantity || "1",
+          discount: formValues.discount || "0",
+          total_amount: calculateTotal(product.sell.toString(), formValues.quantity || "1", formValues.discount || "0").toString()
+        };
+        setFormValues(newFormValues);
+      }
+    }
+  };
+
   const updateURLParams = (params: Record<string, string | number>) => {
     const newParams = new URLSearchParams(searchParams);
     Object.entries(params).forEach(([key, value]) => {
@@ -187,10 +279,16 @@ const InvoiceManagement = () => {
 
   const closeModal = (modalType: keyof typeof modals) => {
     setModals((prev) => ({ ...prev, [modalType]: false }));
-    if (modalType === "createOrEdit" || modalType === "view" || modalType === "delete" || modalType === "calculator") {
+    if (modalType === "createOrEdit" || modalType === "view" || modalType === "delete") {
       setSelectedInvoice(null);
       setSelectedProductForCalc(null);
-      setFormValues({ price: "", quantity: "", discount: "", total_amount: "" });
+      setSelectedProductId("");
+      setFormValues({
+        price: "",
+        quantity: "",
+        discount: "",
+        total_amount: "",
+      });
     }
   };
 
@@ -205,47 +303,50 @@ const InvoiceManagement = () => {
     const priceNum = parseFloat(price) || 0;
     const quantityNum = parseFloat(quantity) || 0;
     const discountNum = parseFloat(discount) || 0;
-    return (priceNum * quantityNum - discountNum).toFixed(2);
+    // Use Math.round to avoid floating point precision issues, similar to Android app
+    return Math.round((priceNum * quantityNum - discountNum) * 100) / 100;
   };
 
-  const calculateProfitMargin = (price: string, quantity: string, product: Product) => {
-    const priceNum = parseFloat(price) || 0;
-    const quantityNum = parseFloat(quantity) || 0;
-    const purchasePrice = product.purchases;
-    const profit = (priceNum - purchasePrice) * quantityNum;
-    const profitPercentage = purchasePrice > 0 ? (profit / (purchasePrice * quantityNum)) * 100 : 0;
-    return {
-      profit: profit.toFixed(2),
-      percentage: profitPercentage.toFixed(2)
-    };
-  };
+  // Enhanced validation function similar to Android app
+  const validateInvoiceData = (values: Record<string, any>) => {
+    const priceNum = parseFloat(values.price) || 0;
+    const quantityNum = parseInt(values.quantity) || 0;
+    const discountNum = parseFloat(values.discount) || 0;
 
-  const handleFormValueChange = (field: string, value: string) => {
-    setFormValues(prev => ({ ...prev, [field]: value }));
-    
-    if (autoCalculate && (field === 'price' || field === 'quantity' || field === 'discount')) {
-      const newValues = { ...formValues, [field]: value };
-      const total = calculateTotal(newValues.price, newValues.quantity, newValues.discount);
-      setFormValues(prev => ({ ...prev, [field]: value, total_amount: total }));
+    if (priceNum <= 0) {
+      toastError("Price must be greater than 0");
+      return false;
     }
-  };
 
-  const handleProductSelection = (productId: string) => {
-    const product = products.find(p => p._id === productId);
-    setSelectedProductForCalc(product || null);
-    
-    if (product && autoCalculate) {
-      setFormValues(prev => ({ 
-        ...prev, 
-        price: product.sell.toString(),
-        total_amount: calculateTotal(product.sell.toString(), prev.quantity, prev.discount)
-      }));
+    if (quantityNum <= 0) {
+      toastError("Quantity must be greater than 0");
+      return false;
     }
+
+    if (discountNum < 0) {
+      toastError("Discount cannot be negative");
+      return false;
+    }
+
+    // Check if discount is greater than subtotal (before discount)
+    const subtotal = priceNum * quantityNum;
+    if (discountNum > subtotal) {
+      toastError("Discount cannot be greater than subtotal amount");
+      return false;
+    }
+
+    return true;
   };
 
   const handleCreateOrEditSubmit = async (values: Record<string, any>) => {
     setIsSubmitting(true);
     try {
+      // Validate invoice data before submission
+      if (!validateInvoiceData(values)) {
+        setIsSubmitting(false);
+        return;
+      }
+
       // Parse and validate the date
       let parsedDate;
       try {
@@ -259,7 +360,7 @@ const InvoiceManagement = () => {
           const [hour, minute] = timePart.split(':');
           parsedDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day), parseInt(hour), parseInt(minute));
         }
-        
+
         if (isNaN(parsedDate.getTime())) {
           throw new Error('Invalid date format');
         }
@@ -269,6 +370,12 @@ const InvoiceManagement = () => {
         return;
       }
 
+      // Recalculate total amount to ensure it's correct before submission
+      const priceNum = parseFloat(values.price);
+      const quantityNum = parseInt(values.quantity);
+      const discountNum = parseFloat(values.discount) || 0;
+      const calculatedTotal = calculateTotal(values.price, values.quantity, values.discount);
+
       const invoiceData = {
         invoice_no: values.invoice_no,
         date_time: parsedDate,
@@ -277,10 +384,10 @@ const InvoiceManagement = () => {
         customer_phone_number: values.customer_phone_number,
         payment_method: values.payment_method,
         product: values.product,
-        price: parseFloat(values.price),
-        quantity: parseInt(values.quantity),
-        total_amount: parseFloat(values.total_amount),
-        discount: parseFloat(values.discount) || 0,
+        price: priceNum,
+        quantity: quantityNum,
+        total_amount: calculatedTotal,
+        discount: discountNum,
         is_sent_sms: values.is_sent_sms || false,
       };
 
@@ -346,9 +453,9 @@ const InvoiceManagement = () => {
           perPage: 10000, // Get all invoices for export
           search: searchInput,
           sort,
-                  payment_method: filters.payment_method || undefined,
-        startDate: filters.startDate || undefined,
-        endDate: filters.endDate || undefined,
+          payment_method: filters.payment_method || undefined,
+          startDate: filters.startDate || undefined,
+          endDate: filters.endDate || undefined,
         },
         responseType: 'blob',
       });
@@ -361,7 +468,7 @@ const InvoiceManagement = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      
+
       toastSuccess("Invoices exported successfully");
     } catch (error) {
       console.error('Export error:', error);
@@ -393,125 +500,6 @@ const InvoiceManagement = () => {
       : "";
   };
 
-  const InvoiceFormController = [
-    {
-      label: "Invoice Number",
-      name: "invoice_no",
-      type: "text" as const,
-      placeholder: "Enter invoice number",
-      required: true,
-      validation: {
-        requiredMessage: "Invoice number is required.",
-      },
-    },
-    {
-      label: "Date & Time",
-      name: "date_time",
-      type: "text" as const,
-      placeholder: "YYYY-MM-DD HH:MM (e.g., 2024-01-15 14:30)",
-      required: true,
-      validation: {
-        requiredMessage: "Date and time are required.",
-        pattern: /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/,
-        message: "Please use format: YYYY-MM-DD HH:MM",
-      },
-    },
-    {
-      label: "Vehicle Number",
-      name: "vehicle_no",
-      type: "text" as const,
-      placeholder: "Enter vehicle number (optional)",
-    },
-    {
-      label: "Customer Name",
-      name: "customer_name",
-      type: "text" as const,
-      placeholder: "Enter customer name",
-      required: true,
-      validation: {
-        requiredMessage: "Customer name is required.",
-      },
-    },
-    {
-      label: "Customer Phone",
-      name: "customer_phone_number",
-      type: "text" as const,
-      placeholder: "Enter customer phone number",
-      required: true,
-      validation: {
-        requiredMessage: "Customer phone number is required.",
-      },
-    },
-    {
-      label: "Payment Method",
-      name: "payment_method",
-      type: "select" as const,
-      required: true,
-      options: [
-        { value: "cash", label: "Cash" },
-        { value: "card", label: "Card" },
-        { value: "bank_transfer", label: "Bank Transfer" },
-        { value: "credit", label: "Credit" },
-        { value: "due", label: "Due" },
-      ],
-      validation: {
-        requiredMessage: "Payment method is required.",
-      },
-    },
-    {
-      label: "Product",
-      name: "product",
-      type: "select" as const,
-      required: true,
-      options: products.map((product) => ({ value: product._id, label: product.name })),
-      validation: {
-        requiredMessage: "Product is required.",
-      },
-    },
-    {
-      label: "Price",
-      name: "price",
-      type: "text" as const,
-      placeholder: "Enter price",
-      required: true,
-      validation: {
-        requiredMessage: "Price is required.",
-      },
-    },
-    {
-      label: "Quantity",
-      name: "quantity",
-      type: "text" as const,
-      placeholder: "Enter quantity",
-      required: true,
-      validation: {
-        requiredMessage: "Quantity is required.",
-      },
-    },
-    {
-      label: "Total Amount",
-      name: "total_amount",
-      type: "text" as const,
-      placeholder: "Enter total amount",
-      required: true,
-      validation: {
-        requiredMessage: "Total amount is required.",
-      },
-    },
-    {
-      label: "Discount",
-      name: "discount",
-      type: "text" as const,
-      placeholder: "Enter discount (optional)",
-    },
-
-    {
-      label: "Send SMS",
-      name: "is_sent_sms",
-      type: "checkbox" as const,
-    },
-  ];
-
   const breadcrumb = [{ label: "Dashboard", path: "/dashboard" }, { label: "Invoice Management" }];
 
   return (
@@ -521,29 +509,284 @@ const InvoiceManagement = () => {
         visible={modals.createOrEdit}
         onHide={() => closeModal("createOrEdit")}
       >
-        <Form
-          fields={InvoiceFormController}
-          initialValues={{
-            invoice_no: selectedInvoice?.invoice_no || generateInvoiceNumber(),
-            date_time: selectedInvoice?.date_time 
-              ? new Date(selectedInvoice.date_time).toISOString().slice(0, 16).replace('T', ' ')
-              : new Date().toISOString().slice(0, 16).replace('T', ' '),
-            vehicle_no: selectedInvoice?.vehicle_no || "",
-            customer_name: selectedInvoice?.customer_name || "",
-            customer_phone_number: selectedInvoice?.customer_phone_number || "",
-            payment_method: selectedInvoice?.payment_method || "cash",
-            product: selectedInvoice?.product._id || "",
-            price: selectedInvoice?.price?.toString() || "",
-            quantity: selectedInvoice?.quantity?.toString() || "",
-            total_amount: selectedInvoice?.total_amount?.toString() || "",
-            discount: selectedInvoice?.discount?.toString() || "0",
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          const formData = new FormData(e.currentTarget);
+          const values = Object.fromEntries(formData.entries());
+          
+          // Ensure all required fields are present
+          const completeValues = {
+            ...values,
+            product: selectedProductId || values.product,
+            price: formValues.price || values.price,
+            quantity: formValues.quantity || values.quantity,
+            discount: formValues.discount || values.discount,
+            total_amount: formValues.total_amount || values.total_amount,
+            is_sent_sms: values.is_sent_sms === 'on'
+          };
+          
+          handleCreateOrEditSubmit(completeValues);
+        }} className="space-y-6">
+          {/* Invoice Number */}
+          <div className="space-y-2">
+            <label htmlFor="invoice_no" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Invoice Number <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              id="invoice_no"
+              name="invoice_no"
+              defaultValue={selectedInvoice?.invoice_no || generateInvoiceNumber()}
+              placeholder="Enter invoice number"
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            />
+          </div>
 
-            is_sent_sms: selectedInvoice?.is_sent_sms || false,
-          }}
-          onSubmit={handleCreateOrEditSubmit}
-          buttonText={selectedInvoice ? "Update Invoice" : "Create Invoice"}
-          loading={isSubmitting}
-        />
+          {/* Date & Time */}
+          <div className="space-y-2">
+            <label htmlFor="date_time" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Date & Time <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              id="date_time"
+              name="date_time"
+              defaultValue={selectedInvoice?.date_time
+                ? new Date(selectedInvoice.date_time).toISOString().slice(0, 16).replace('T', ' ')
+                : new Date().toISOString().slice(0, 16).replace('T', ' ')}
+              placeholder="YYYY-MM-DD HH:MM (e.g., 2024-01-15 14:30)"
+              required
+              pattern="^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            />
+          </div>
+
+          {/* Vehicle Number */}
+          <div className="space-y-2">
+            <label htmlFor="vehicle_no" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Vehicle Number
+            </label>
+            <input
+              type="text"
+              id="vehicle_no"
+              name="vehicle_no"
+              defaultValue={selectedInvoice?.vehicle_no || ""}
+              placeholder="Enter vehicle number (optional)"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            />
+          </div>
+
+          {/* Customer Name */}
+          <div className="space-y-2">
+            <label htmlFor="customer_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Customer Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              id="customer_name"
+              name="customer_name"
+              defaultValue={selectedInvoice?.customer_name || ""}
+              placeholder="Enter customer name"
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            />
+          </div>
+
+          {/* Customer Phone */}
+          <div className="space-y-2">
+            <label htmlFor="customer_phone_number" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Customer Phone <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              id="customer_phone_number"
+              name="customer_phone_number"
+              defaultValue={selectedInvoice?.customer_phone_number || ""}
+              placeholder="Enter customer phone number"
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            />
+          </div>
+
+          {/* Payment Method */}
+          <div className="space-y-2">
+            <label htmlFor="payment_method" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Payment Method <span className="text-red-500">*</span>
+            </label>
+            <select
+              id="payment_method"
+              name="payment_method"
+              defaultValue={selectedInvoice?.payment_method || "cash"}
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            >
+              <option value="cash">Cash</option>
+              <option value="card">Card</option>
+              <option value="bank_transfer">Bank Transfer</option>
+              <option value="credit">Credit</option>
+              <option value="due">Due</option>
+            </select>
+          </div>
+
+          {/* Product */}
+          <div className="space-y-2">
+            <label htmlFor="product" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Product <span className="text-red-500">*</span>
+            </label>
+            <select
+              id="product"
+              name="product"
+              value={selectedProductId || selectedInvoice?.product._id || ""}
+              onChange={(e) => handleProductChange(e.target.value)}
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            >
+              <option value="">Select a product</option>
+              {products.map((product) => (
+                <option key={product._id} value={product._id}>
+                  {product.name} - ${product.sell}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Price */}
+          <div className="space-y-2">
+            <label htmlFor="price" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Price <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              id="price"
+              name="price"
+              value={formValues.price || selectedInvoice?.price?.toString() || ""}
+              onChange={(e) => {
+                const value = e.target.value;
+                setFormValues(prev => ({
+                  ...prev,
+                  price: value,
+                  total_amount: calculateTotal(value, prev.quantity || "1", prev.discount || "0").toString()
+                }));
+              }}
+              placeholder="Enter price"
+              required
+              step="0.01"
+              min="0"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            />
+          </div>
+
+          {/* Quantity */}
+          <div className="space-y-2">
+            <label htmlFor="quantity" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Quantity <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              id="quantity"
+              name="quantity"
+              value={formValues.quantity || selectedInvoice?.quantity?.toString() || "1"}
+              onChange={(e) => {
+                const value = e.target.value;
+                setFormValues(prev => ({
+                  ...prev,
+                  quantity: value,
+                  total_amount: calculateTotal(prev.price || "0", value, prev.discount || "0").toString()
+                }));
+              }}
+              placeholder="Enter quantity"
+              required
+              min="1"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            />
+          </div>
+
+          {/* Total Amount */}
+          <div className="space-y-2">
+            <label htmlFor="total_amount" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Total Amount <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              id="total_amount"
+              name="total_amount"
+              value={formValues.total_amount || selectedInvoice?.total_amount?.toString() || "0.00"}
+              placeholder="Auto-calculated"
+              required
+              readOnly
+              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 dark:bg-gray-600 dark:border-gray-600 dark:text-white cursor-not-allowed"
+            />
+            <p className="text-xs text-gray-500 dark:text-gray-400">Formula: (Price × Quantity) - Discount</p>
+          </div>
+
+          {/* Discount */}
+          <div className="space-y-2">
+            <label htmlFor="discount" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Discount
+            </label>
+            <input
+              type="number"
+              id="discount"
+              name="discount"
+              value={formValues.discount || selectedInvoice?.discount?.toString() || "0"}
+              onChange={(e) => {
+                const value = e.target.value;
+                setFormValues(prev => ({
+                  ...prev,
+                  discount: value,
+                  total_amount: calculateTotal(prev.price || "0", prev.quantity || "1", value).toString()
+                }));
+              }}
+              placeholder="Enter discount (optional)"
+              step="0.01"
+              min="0"
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+            />
+          </div>
+
+          {/* Send SMS */}
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              id="is_sent_sms"
+              name="is_sent_sms"
+              defaultChecked={selectedInvoice?.is_sent_sms || false}
+              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <label htmlFor="is_sent_sms" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Send SMS
+            </label>
+          </div>
+
+          {/* Submit Button */}
+          <div className="flex justify-end space-x-3 pt-4">
+            <button
+              type="button"
+              onClick={() => closeModal("createOrEdit")}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? (
+                <span className="flex items-center">
+                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Processing...
+                </span>
+              ) : (
+                selectedInvoice ? "Update Invoice" : "Create Invoice"
+              )}
+            </button>
+          </div>
+        </form>
       </Dialog>
 
       <Dialog header="View Invoice" visible={modals.view} onHide={() => closeModal("view")}>
@@ -619,13 +862,6 @@ const InvoiceManagement = () => {
               </div>
             )}
             <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Profit Margin</label>
-              <p className="mt-1 text-sm text-green-600 font-semibold">
-                {((selectedInvoice.price - selectedInvoice.product.purchases) / selectedInvoice.product.purchases * 100).toFixed(2)}% 
-                (${((selectedInvoice.price - selectedInvoice.product.purchases) * selectedInvoice.quantity).toFixed(2)})
-              </p>
-            </div>
-            <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">SMS Sent</label>
               <p className="mt-1 text-sm text-gray-900 dark:text-gray-100">
                 {selectedInvoice.is_sent_sms ? "Yes" : "No"}
@@ -648,132 +884,6 @@ const InvoiceManagement = () => {
           </div>
         )}
       </Dialog>
-
-      {/* Calculator Modal */}
-      <Dialog header="Invoice Calculator" visible={modals.calculator} onHide={() => closeModal("calculator")}>
-        <div className="space-y-4">
-          <div className="flex items-center space-x-2 mb-4">
-            <input
-              type="checkbox"
-              id="autoCalculate"
-              checked={autoCalculate}
-              onChange={(e) => setAutoCalculate(e.target.checked)}
-              className="rounded"
-            />
-            <label htmlFor="autoCalculate" className="text-sm font-medium text-gray-700">
-              Auto-calculate totals
-            </label>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Product</label>
-            <select
-              onChange={(e) => handleProductSelection(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:border-blue-500 focus:outline-none"
-            >
-              <option value="">Select a product</option>
-              {products.map((product) => (
-                <option key={product._id} value={product._id}>
-                  {product.name} - ${product.sell}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Price</label>
-              <input
-                type="number"
-                value={formValues.price}
-                onChange={(e) => handleFormValueChange('price', e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:border-blue-500 focus:outline-none"
-                placeholder="0.00"
-                step="0.01"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Quantity</label>
-              <input
-                type="number"
-                value={formValues.quantity}
-                onChange={(e) => handleFormValueChange('quantity', e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:border-blue-500 focus:outline-none"
-                placeholder="0"
-                min="1"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Discount</label>
-              <input
-                type="number"
-                value={formValues.discount}
-                onChange={(e) => handleFormValueChange('discount', e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:border-blue-500 focus:outline-none"
-                placeholder="0.00"
-                step="0.01"
-                min="0"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Total Amount</label>
-              <input
-                type="number"
-                value={formValues.total_amount}
-                onChange={(e) => handleFormValueChange('total_amount', e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:border-blue-500 focus:outline-none bg-gray-50"
-                placeholder="0.00"
-                step="0.01"
-                readOnly={autoCalculate}
-              />
-            </div>
-          </div>
-
-          {selectedProductForCalc && formValues.price && formValues.quantity && (
-            <div className="bg-green-50 border border-green-200 rounded-md p-3">
-              <h4 className="font-medium text-green-800 mb-2">Profit Analysis</h4>
-              <div className="space-y-1 text-sm">
-                <div className="flex justify-between">
-                  <span>Purchase Price:</span>
-                  <span>${selectedProductForCalc.purchases}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Sell Price:</span>
-                  <span>${formValues.price}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Profit per Unit:</span>
-                  <span className="text-green-600">${(parseFloat(formValues.price) - selectedProductForCalc.purchases).toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Total Profit:</span>
-                  <span className="text-green-600 font-semibold">
-                    ${((parseFloat(formValues.price) - selectedProductForCalc.purchases) * parseFloat(formValues.quantity)).toFixed(2)}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Profit Margin:</span>
-                  <span className="text-green-600 font-semibold">
-                    {((parseFloat(formValues.price) - selectedProductForCalc.purchases) / selectedProductForCalc.purchases * 100).toFixed(2)}%
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="flex justify-end space-x-2">
-            <Button variant="light" onClick={() => closeModal("calculator")}>
-              Close
-            </Button>
-          </div>
-        </div>
-      </Dialog>
-
-
-
       <Dialog header="Filter Invoices" visible={modals.filter} onHide={() => closeModal("filter")}>
         <div className="space-y-4">
           <div>
@@ -842,10 +952,6 @@ const InvoiceManagement = () => {
           subtitle="Manage invoices and their details"
           actions={
             <div className="flex space-x-2">
-              <Button variant="light" onClick={() => openModal("calculator")}>
-                <LucideCalculator className="mr-2" />
-                Calculator
-              </Button>
               <Button variant="light" onClick={() => openModal("filter")}>
                 <FiFilter className="mr-2" />
                 Filter

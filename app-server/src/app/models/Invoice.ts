@@ -50,10 +50,10 @@ const InvoiceSchema: Schema<IInvoice> = new Schema(
       trim: true,
       validate: {
         validator: function(v: string) {
-          // International phone number validation (allows +, digits, spaces, hyphens, parentheses)
-          return /^[\+]?[1-9][\d]{0,15}$/.test(v.replace(/[\s\-\(\)]/g, ''));
+          const cleanPhone = v.replace(/[\s\-\(\)]/g, '');
+          return /^(\+?880|0?)(1[3-9]\d{8})$/.test(cleanPhone);
         },
-        message: 'Please enter a valid phone number'
+        message: 'Please enter a valid Bangladeshi phone number (e.g., 01712345678, +8801712345678)'
       }
     },
     payment_method: { 

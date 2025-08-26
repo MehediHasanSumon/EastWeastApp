@@ -33,6 +33,8 @@ import MessageReactions from '../components/MessageReactions';
 import { useToast } from '../context/ToastContext';
 import ToastContainer from '../components/ToastContainer';
 import { LinearGradient } from 'expo-linear-gradient';
+import CallActionButtons from '../components/CallActionButtons';
+import GlobalCallManager from '../components/GlobalCallManager';
 
 const { width, height } = Dimensions.get('window');
 
@@ -263,7 +265,7 @@ Animated.sequence([
   const handleImagePicker = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: 'images',
         allowsEditing: true,
         aspect: [4, 3],
         quality: 0.8,
@@ -310,7 +312,7 @@ Animated.sequence([
     }
   };
 
-  const handleMessageEdit = (newContent: string) => {
+  const handleEditMessage = (newContent: string) => {
     if (selectedMessage) {
       // TODO: Implement edit logic with socket
       console.log('Edit message:', selectedMessage._id, 'to:', newContent);
@@ -318,7 +320,7 @@ Animated.sequence([
     }
   };
 
-  const handleMessageDelete = (deleteForEveryone: boolean) => {
+  const handleDeleteMessage = (deleteForEveryone: boolean) => {
     if (selectedMessage) {
       // TODO: Implement delete logic with socket
       console.log('Delete message:', selectedMessage._id, 'for everyone:', deleteForEveryone);
@@ -326,7 +328,7 @@ Animated.sequence([
     }
   };
 
-  const handleMessageReply = () => {
+  const handleReplyMessage = () => {
     if (selectedMessage) {
       // TODO: Implement reply logic
       console.log('Reply to message:', selectedMessage._id);
@@ -631,12 +633,15 @@ Animated.sequence([
         </TouchableOpacity>
         
         <View style={styles.headerActions}>
-          <TouchableOpacity style={[styles.headerActionButton, { backgroundColor: theme.mode === 'dark' ? '#3A3B3C' : '#F0F2F5' }]}>
-            <Ionicons name="call" size={18} color="#0084FF" />
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.headerActionButton, { backgroundColor: theme.mode === 'dark' ? '#3A3B3C' : '#F0F2F5' }]}>
-            <Ionicons name="videocam" size={18} color="#0084FF" />
-          </TouchableOpacity>
+          {/* Call Action Buttons */}
+          {currentConversation.type === 'direct' && (
+            <CallActionButtons
+              conversationId={currentConversation._id}
+              remoteUserId={currentConversation.participants.find(p => p._id !== user?._id)?._id || ''}
+              remoteUserName={currentConversation.participants.find(p => p._id !== user?._id)?.name || 'Unknown User'}
+            />
+          )}
+          
           <TouchableOpacity 
             style={[styles.headerActionButton, { backgroundColor: theme.mode === 'dark' ? '#3A3B3C' : '#F0F2F5' }]}
             onPress={() => setShowUserInfo(true)}
@@ -725,6 +730,12 @@ Animated.sequence([
         </View>
       </View>
 
+      {/* Toast Container for notifications */}
+      <ToastContainer />
+
+      {/* Global Call Manager */}
+      <GlobalCallManager />
+
       {/* User Info Modal */}
       <UserInfoModal
         visible={showUserInfo}
@@ -737,22 +748,17 @@ Animated.sequence([
       {selectedMessage && (
         <MessageActions
           visible={showMessageActions}
-          onClose={() => {
-            setShowMessageActions(false);
-            setSelectedMessage(null);
-          }}
           message={selectedMessage}
+          onClose={() => setShowMessageActions(false)}
+          onEdit={handleEditMessage}
+          onDelete={handleDeleteMessage}
+          onReply={handleReplyMessage}
           isOwnMessage={isOwnMessage(selectedMessage)}
           onReact={handleMessageReact}
-          onEdit={handleMessageEdit}
-          onDelete={handleMessageDelete}
-          onReply={handleMessageReply}
           onForward={handleMessageForward}
         />
       )}
       
-      {/* Toast Container for notifications */}
-      <ToastContainer />
     </View>
   );
 };

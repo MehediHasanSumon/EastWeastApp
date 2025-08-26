@@ -54,24 +54,6 @@ export const getColumns = ({
     ),
   },
   {
-    header: "Profit Margin",
-    accessor: "profit",
-    cell: (row) => {
-      const profit = row.sell - row.purchases;
-      const margin = row.purchases > 0 ? (profit / row.purchases) * 100 : 0;
-      return (
-        <div className="text-sm">
-          <div className={`font-medium ${profit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-            ${profit.toFixed(2)}
-          </div>
-          <div className="text-gray-500 dark:text-gray-400">
-            {margin.toFixed(1)}%
-          </div>
-        </div>
-      );
-    },
-  },
-  {
     header: "Description",
     accessor: "description",
     cell: (row) => (

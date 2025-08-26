@@ -9,19 +9,6 @@ import {
   updateUserVerification,
 } from "../app/controllers/Admin/users.controller";
 import {
-  createPermission,
-  deletePermissions,
-  getAllPermissions,
-  updatePermission,
-} from "../app/controllers/Admin/permission.controller";
-import {
-  createRole,
-  deleteRoles,
-  getAllRoles,
-  getAllPermissionsForRole,
-  updateRole,
-} from "../app/controllers/Admin/role.controller";
-import {
   createProduct,
   deleteProducts,
   getAllProducts,
@@ -43,6 +30,15 @@ import {
   getProductPerformanceReport,
   getCustomerAnalysisReport,
 } from "../app/controllers/Admin/report.controller";
+import {
+  createOrUpdateSMSTemplate,
+  getAllSMSTemplates,
+  getSMSTemplateById,
+  getLatestActiveSMSTemplate,
+  toggleTemplateStatus,
+  deleteSMSTemplate,
+  bulkUpdateTemplates,
+} from "../app/controllers/Admin/settings.controller";
 
 const route = Router();
 
@@ -76,5 +72,14 @@ route.get("/reports/detailed", getDetailedReport);
 route.get("/reports/export", exportReport);
 route.get("/reports/product-performance", getProductPerformanceReport);
 route.get("/reports/customer-analysis", getCustomerAnalysisReport);
+
+// SMS Settings
+route.post("/sms-template", createOrUpdateSMSTemplate);
+route.get("/sms-templates", getAllSMSTemplates);
+route.get("/sms-template/:id", getSMSTemplateById);
+route.get("/sms-template-latest/active", getLatestActiveSMSTemplate);
+route.put("/sms-template/:id/toggle-status", toggleTemplateStatus);
+route.delete("/sms-template/:id", deleteSMSTemplate);
+route.put("/sms-templates/bulk-update", bulkUpdateTemplates);
 
 export default route;

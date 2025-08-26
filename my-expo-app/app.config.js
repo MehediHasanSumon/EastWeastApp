@@ -26,7 +26,13 @@ export default {
         "READ_MEDIA_IMAGES",
         "READ_EXTERNAL_STORAGE", 
         "CAMERA", 
-        "AUDIO_RECORDING"
+        "AUDIO_RECORDING",
+        "RECORD_AUDIO",
+        "MODIFY_AUDIO_SETTINGS",
+        "VIBRATE",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "WAKE_LOCK"
       ]
     },
     web: {

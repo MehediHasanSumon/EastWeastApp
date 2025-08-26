@@ -1,6 +1,6 @@
 import { io, Socket } from 'socket.io-client';
 import { getRefreshToken } from './authStorage';
-import { ChatMessage, SocketMessage, TypingUser } from '../types/chat';
+import { ChatMessage, SocketMessage, TypingUser, CallInvite, CallType } from '../types/chat';
 import Constants from 'expo-constants';
 
 // Configure socket URL for different environments
@@ -131,6 +131,31 @@ class ChatSocketService {
       this.emit('conversation_updated', data);
     });
 
+    // Call events
+    this.socket.on('call_invite', (data: CallInvite) => {
+      this.emit('call_invite', data);
+    });
+
+    this.socket.on('call_accepted', (data: { conversationId: string; fromUserId: string }) => {
+      this.emit('call_accepted', data);
+    });
+
+    this.socket.on('call_rejected', (data: { conversationId: string; fromUserId: string; reason: string }) => {
+      this.emit('call_rejected', data);
+    });
+
+    this.socket.on('call_cancelled', (data: { conversationId: string; fromUserId: string }) => {
+      this.emit('call_cancelled', data);
+    });
+
+    this.socket.on('call_ended', (data: { conversationId: string; fromUserId: string }) => {
+      this.emit('call_ended', data);
+    });
+
+    this.socket.on('webrtc_signal', (data: { conversationId: string; signal: any }) => {
+      this.emit('webrtc_signal', data);
+    });
+
     this.socket.on('error', (error: any) => {
       console.error('Socket error:', error);
       this.emit('error', error);
@@ -212,6 +237,49 @@ class ChatSocketService {
     if (this.socket && this.isConnected) {
       this.socket.emit('delete_message', { messageId });
     }
+  }
+
+  // Call-related methods
+  inviteToCall(conversationId: string, callType: CallType) {
+    if (!this.socket || !this.isConnected) {
+      throw new Error('Socket not connected');
+    }
+    this.socket.emit('call_invite', { conversationId, callType });
+  }
+
+  acceptCall(conversationId: string) {
+    if (!this.socket || !this.isConnected) {
+      throw new Error('Socket not connected');
+    }
+    this.socket.emit('call_accepted', { conversationId });
+  }
+
+  rejectCall(conversationId: string, reason: string = 'declined') {
+    if (!this.socket || !this.isConnected) {
+      throw new Error('Socket not connected');
+    }
+    this.socket.emit('call_rejected', { conversationId, reason });
+  }
+
+  cancelCall(conversationId: string) {
+    if (!this.socket || !this.isConnected) {
+      throw new Error('Socket not connected');
+    }
+    this.socket.emit('call_cancelled', { conversationId });
+  }
+
+  endCall(conversationId: string) {
+    if (!this.socket || !this.isConnected) {
+      throw new Error('Socket not connected');
+    }
+    this.socket.emit('call_ended', { conversationId });
+  }
+
+  sendWebRTCSignal(conversationId: string, signal: any) {
+    if (!this.socket || !this.isConnected) {
+      throw new Error('Socket not connected');
+    }
+    this.socket.emit('webrtc_signal', { conversationId, signal });
   }
 
   // Event listener management

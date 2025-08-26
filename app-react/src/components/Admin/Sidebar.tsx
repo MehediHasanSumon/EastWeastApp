@@ -1,6 +1,14 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { FaRegUserCircle } from "react-icons/fa";
-import { FiBarChart, FiFolder, FiHome, FiMessageCircle } from "react-icons/fi";
+import {
+  FaRegUserCircle,
+  FaFileInvoice,
+  FaBox,
+  FaCog,
+  FaUsers,
+  FaUserShield,
+  FaKey
+} from "react-icons/fa";
+import { FiHome, FiMessageCircle, FiPieChart } from "react-icons/fi";
 import type { IconType } from "react-icons/lib";
 import { useSelector } from "react-redux";
 import type { RootState } from "../../interface/types";
@@ -56,44 +64,50 @@ const Sidebar = ({
     {
       label: "Invoice Management",
       to: "/invoices",
-      icon: FiFolder,     
+      icon: FaFileInvoice,
       // permission: "view-invoice",
     },
     {
       label: "Product Management",
       to: "/products",
-      icon: FiFolder,     
+      icon: FaBox,
       // permission: "view-product",
     },
     {
       label: "Report Management",
       to: "/reports",
-      icon: FiBarChart,
+      icon: FiPieChart,
       // permission: "view-report",
     },
     {
       label: "User Management",
-      icon: FaRegUserCircle,
+      icon: FaUsers,
       children: [
         {
           label: "Roles Management",
           to: "/roles",
-          icon: FiFolder,
+          icon: FaUserShield,
           permission: "view-role",
         },
         {
           label: "Permissions Management",
           to: "/permissions",
-          icon: FiFolder,
+          icon: FaKey,
           permission: "view-permission",
         },
         {
           label: "User Management",
           to: "/users",
-          icon: FiFolder,
+          icon: FaRegUserCircle,
           permission: "view-user",
         },
       ],
+    },
+    {
+      label: "Settings",
+      to: "/settings",
+      icon: FaCog,
+      // permission: "view-report",
     },
   ];
 
@@ -119,9 +133,8 @@ const Sidebar = ({
         initial={{ x: -300 }}
         animate={{ x: sidebarOpen ? 0 : -300 }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-        className={`fixed top-0 left-0 z-50 w-64 pt-16 h-screen transition-all duration-300 ease-in-out ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } lg:translate-x-0`}
+        className={`fixed top-0 left-0 z-50 w-64 pt-16 h-screen transition-all duration-300 ease-in-out ${sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          } lg:translate-x-0`}
       >
         <div className="h-full flex flex-col bg-gradient-to-b from-white to-gray-50 border-r border-gray-200/50 dark:from-gray-800 dark:to-gray-900 dark:border-r dark:border-gray-700/50">
           <nav className="flex-1 px-1 py-2 overflow-y-auto">
