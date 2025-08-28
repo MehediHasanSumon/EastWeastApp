@@ -137,6 +137,9 @@ class ChatSocketService {
       this.emit("read_error", error);
     });
 
+    // Set up page visibility listener
+    this.setupVisibilityListener();
+
     // WebRTC signaling events
     this.socket.on("call_invite", (data) => this.emit("call_invite", data));
     this.socket.on("call_cancelled", (data) => this.emit("call_cancelled", data));
@@ -262,13 +265,45 @@ class ChatSocketService {
   // Disconnect
   disconnect() {
     if (!this.socket) return;
-    // Only actively disconnect if we are connected; otherwise avoid benign warning
+    // Set user offline before disconnecting
     if (this.socket.connected) {
+      this.socket.emit('user_offline');
       this.socket.disconnect();
     }
     this.socket = null;
     this.isConnected = false;
     this.listeners.clear();
+  }
+
+  private setupVisibilityListener() {
+    if (typeof document === 'undefined') return;
+
+    const handleVisibilityChange = () => {
+      if (!this.socket || !this.isConnected) return;
+      
+      if (document.hidden) {
+        this.socket.emit('user_offline');
+      } else {
+        this.socket.emit('user_online');
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Set online when page loads
+    if (!document.hidden && this.socket && this.isConnected) {
+      this.socket.emit('user_online');
+    }
+  }
+
+  setUserOnline() {
+    if (!this.socket || !this.isConnected) return;
+    this.socket.emit('user_online');
+  }
+
+  setUserOffline() {
+    if (!this.socket || !this.isConnected) return;
+    this.socket.emit('user_offline');
   }
 
   // Get connection status

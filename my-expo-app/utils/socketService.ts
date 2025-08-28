@@ -1,4 +1,5 @@
 import { io, Socket } from 'socket.io-client';
+import { AppState, AppStateStatus } from 'react-native';
 import { getRefreshToken } from './authStorage';
 import { API_BASE_URL } from './api';
 
@@ -6,6 +7,7 @@ class ChatSocketService {
   private socket: Socket | null = null;
   private isConnected = false;
   private listeners: Map<string, Function[]> = new Map();
+  private appStateSubscription: any = null;
 
   async connect() {
     if (this.socket && this.isConnected) return;
@@ -57,6 +59,12 @@ class ChatSocketService {
     this.socket.on('message_error', (error) => {
       this.emit('message_error', error);
     });
+
+    this.socket.on('user_presence', (data) => {
+      this.emit('user_presence', data);
+    });
+
+    this.setupAppStateListener();
   }
 
   sendMessage(data: {
@@ -111,8 +119,37 @@ class ChatSocketService {
     }
   }
 
+  private setupAppStateListener() {
+    this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange.bind(this));
+  }
+
+  private handleAppStateChange(nextAppState: AppStateStatus) {
+    if (!this.socket || !this.isConnected) return;
+
+    if (nextAppState === 'active') {
+      this.socket.emit('user_online');
+    } else if (nextAppState === 'background' || nextAppState === 'inactive') {
+      this.socket.emit('user_offline');
+    }
+  }
+
+  setUserOnline() {
+    if (!this.socket || !this.isConnected) return;
+    this.socket.emit('user_online');
+  }
+
+  setUserOffline() {
+    if (!this.socket || !this.isConnected) return;
+    this.socket.emit('user_offline');
+  }
+
   disconnect() {
+    if (this.appStateSubscription) {
+      this.appStateSubscription.remove();
+      this.appStateSubscription = null;
+    }
     if (this.socket?.connected) {
+      this.socket.emit('user_offline');
       this.socket.disconnect();
     }
     this.socket = null;

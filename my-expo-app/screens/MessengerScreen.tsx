@@ -53,7 +53,8 @@ const MessengerScreen = ({ navigation }: Props) => {
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([]);
-  const [isTyping, setIsTyping] = useState(false);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     fetchConversations();
@@ -61,6 +62,7 @@ const MessengerScreen = ({ navigation }: Props) => {
     initializeSocket();
     
     return () => {
+      chatSocketService.setUserOffline();
       chatSocketService.disconnect();
     };
   }, []);
@@ -72,23 +74,45 @@ const MessengerScreen = ({ navigation }: Props) => {
       if (selectedConversation && message.conversationId === selectedConversation._id) {
         setMessages(prev => [...prev, message]);
       }
-      fetchConversations(); // Refresh conversation list
+      fetchConversations();
     });
 
     chatSocketService.on('typing_start', (data: any) => {
       if (selectedConversation && data.conversationId === selectedConversation._id && data.userId !== currentUserId) {
-        setIsTyping(true);
+        setTypingUsers(prev => {
+          if (!prev.includes(data.userId)) {
+            return [...prev, data.userId];
+          }
+          return prev;
+        });
       }
     });
 
     chatSocketService.on('typing_stop', (data: any) => {
       if (selectedConversation && data.conversationId === selectedConversation._id) {
-        setIsTyping(false);
+        setTypingUsers(prev => prev.filter(userId => userId !== data.userId));
       }
     });
 
     chatSocketService.on('message_error', (error: any) => {
       console.error('Message error:', error);
+    });
+
+    chatSocketService.on('user_presence', (data: any) => {
+      setConversations(prev => 
+        prev.map(conv => ({
+          ...conv,
+          participants: conv.participants.map(p => 
+            p._id === data.userId 
+              ? { ...p, presence: { isOnline: data.isOnline } }
+              : p
+          )
+        }))
+      );
+    });
+
+    chatSocketService.on('socket_connected', () => {
+      chatSocketService.setUserOnline();
     });
   };
 
@@ -171,6 +195,17 @@ const MessengerScreen = ({ navigation }: Props) => {
   const sendMessage = () => {
     if (!messageText.trim() || !selectedConversation) return;
     
+    const tempMessage = {
+      _id: Date.now().toString(),
+      content: messageText.trim(),
+      sender: { _id: currentUserId, name: 'You' },
+      createdAt: new Date().toISOString(),
+      conversationId: selectedConversation._id,
+      messageType: 'text'
+    };
+    
+    setMessages(prev => [...prev, tempMessage]);
+    
     chatSocketService.sendMessage({
       conversationId: selectedConversation._id,
       content: messageText.trim(),
@@ -178,6 +213,10 @@ const MessengerScreen = ({ navigation }: Props) => {
     });
     
     setMessageText('');
+    if (typingTimeout) {
+      clearTimeout(typingTimeout);
+      setTypingTimeout(null);
+    }
     chatSocketService.stopTyping(selectedConversation._id);
   };
 
@@ -186,10 +225,39 @@ const MessengerScreen = ({ navigation }: Props) => {
     
     if (!selectedConversation) return;
     
+    if (typingTimeout) {
+      clearTimeout(typingTimeout);
+    }
+    
     if (text.length > 0) {
       chatSocketService.startTyping(selectedConversation._id);
+      
+      const timeout = setTimeout(() => {
+        chatSocketService.stopTyping(selectedConversation._id);
+      }, 2000);
+      
+      setTypingTimeout(timeout);
     } else {
       chatSocketService.stopTyping(selectedConversation._id);
+    }
+  };
+
+  const getTypingText = () => {
+    if (typingUsers.length === 0) return '';
+    
+    const typingUserNames = typingUsers
+      .map(userId => {
+        const user = selectedConversation?.participants.find(p => p._id === userId);
+        return user?.name || 'Someone';
+      })
+      .filter(Boolean);
+    
+    if (typingUserNames.length === 1) {
+      return `${typingUserNames[0]} is typing...`;
+    } else if (typingUserNames.length === 2) {
+      return `${typingUserNames[0]} and ${typingUserNames[1]} are typing...`;
+    } else {
+      return 'Several people are typing...';
     }
   };
 
@@ -214,6 +282,7 @@ const MessengerScreen = ({ navigation }: Props) => {
           setSelectedConversation(item);
           setActiveTab('chat');
           fetchMessages(item._id);
+          setTypingUsers([]);
         }}>
         <View className="relative mr-3">
           <View
@@ -400,12 +469,17 @@ const MessengerScreen = ({ navigation }: Props) => {
         style={{ backgroundColor: theme.bgColor }}
       />
       
-      {isTyping && (
-        <View className="px-4 py-2">
+      {typingUsers.length > 0 && (
+        <View className="px-4 py-2 flex-row items-center">
+          <View className="flex-row mr-2">
+            <View className="w-2 h-2 bg-blue-500 rounded-full animate-pulse mr-1" />
+            <View className="w-2 h-2 bg-blue-500 rounded-full animate-pulse mr-1" />
+            <View className="w-2 h-2 bg-blue-500 rounded-full animate-pulse" />
+          </View>
           <Text
             className="text-sm italic"
             style={{ color: theme.mode === 'dark' ? '#888' : '#666' }}>
-            Someone is typing...
+            {getTypingText()}
           </Text>
         </View>
       )}

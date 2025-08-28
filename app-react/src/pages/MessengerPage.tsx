@@ -178,6 +178,10 @@ const MessengerPage: React.FC = () => {
         dispatch(updateUserPresence(data));
       });
 
+      chatSocketService.on("socket_connected", () => {
+        chatSocketService.setUserOnline();
+      });
+
       chatSocketService.on("unread_counts_updated", (_data: any) => {
         // For now we re-fetch conversations to sync unread counts accurately
         dispatch(fetchConversations());
@@ -216,6 +220,7 @@ const MessengerPage: React.FC = () => {
 
     return () => {
       if (socketInitialized.current) {
+        chatSocketService.setUserOffline();
         chatSocketService.disconnect();
         socketInitialized.current = false;
       }
