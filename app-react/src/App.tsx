@@ -4,12 +4,10 @@ import { useDispatch, useSelector } from "react-redux";
 import { BrowserRouter, Route, Routes, useLocation, Navigate } from "react-router";
 import { authUser, setUser } from "./app/features/auth/authSlice";
 import type { AppDispatch, RootState } from "./app/Store";
-import ProfileLayout from "./layouts/ProfileLayout";
 import AuthMiddleware from "./middlewares/AuthMiddleware";
 import GuestMiddleware from "./middlewares/GuestMiddleware";
 import AccountEmailSettings from "./pages/Admin/Account/AccountEmailSettings";
 import AccountPasswordSettings from "./pages/Admin/Account/AccountPasswordSettings";
-import AppearanceSettings from "./pages/Admin/Account/AppearanceSettings";
 import ProfileInformation from "./pages/Admin/Account/ProfileInformation";
 import Dashboard from "./pages/Admin/Dashboard";
 import InvoiceManagement from "./pages/Admin/Invoice/InvoiceManagement";
@@ -22,14 +20,10 @@ import EmailVerification from "./pages/Auth/EmailVerification";
 import ForgotPassword from "./pages/Auth/ForgotPassword";
 import Login from "./pages/Auth/Login";
 import Register from "./pages/Auth/Register";
-import ChangeEmail from "./pages/ChangeEmail";
-import ChangePassword from "./pages/ChangePassword";
 import InternalServerError from "./pages/Errors/InternalServerError";
 import NotFound from "./pages/Errors/NotFound";
 import Unauthorized from "./pages/Errors/Unauthorized";
 import UnderConstruction from "./pages/Errors/UnderConstruction";
-import ProfileInfo from "./pages/ProfileInfo";
-import ThemePreferences from "./pages/ThemePreferences";
 import MessengerPage from "./pages/MessengerPage";
 import { getOrCreateDeviceId, hexToString } from "./utils/Lib";
 import { getCookie } from "./utils/Storage";
@@ -91,7 +85,7 @@ const AppRoutes = () => {
 
       <Route path="/" element={<AuthMiddleware />}>
         <Route path="dashboard" element={<Dashboard />} />
-
+        <Route path="/messenger" element={<MessengerPage />} />
         {/* User  management*/}
         <Route path="roles" element={<RoleManagement />} />
         <Route path="permissions" element={<PermissionManagement />} />
@@ -108,17 +102,6 @@ const AppRoutes = () => {
         <Route path="account-settings" element={<ProfileInformation />} />
         <Route path="email-settings" element={<AccountEmailSettings />} />
         <Route path="password-settings" element={<AccountPasswordSettings />} />
-        <Route path="theme-settings" element={<AppearanceSettings />} />
-      </Route>
-
-      <Route element={<AuthMiddleware />}>
-        <Route element={<ProfileLayout />}>
-          <Route path="/profile" element={<ProfileInfo />} />
-          <Route path="/email" element={<ChangeEmail />} />
-          <Route path="/password" element={<ChangePassword />} />
-          <Route path="/theme" element={<ThemePreferences />} />
-        </Route>
-        <Route path="/messenger" element={<MessengerPage />} />
       </Route>
     </Routes>
   );

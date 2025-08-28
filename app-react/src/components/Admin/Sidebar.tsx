@@ -59,7 +59,7 @@ const Sidebar = ({
       to: "/messenger",
       icon: FiMessageCircle,
       badge: 3,
-      permission: "view-messages",
+      // permission: "view-messages",
     },
     {
       label: "Invoice Management",

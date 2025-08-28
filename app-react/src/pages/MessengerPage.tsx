@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import { toast } from "react-hot-toast";
 import { useDispatch, useSelector } from "react-redux";
-import { 
-  Plus, 
-  Search, 
-  MessageCircle, 
+import {
+  Plus,
+  Search,
+  MessageCircle,
   User,
   Sparkles,
   Users
@@ -32,8 +32,8 @@ import ConversationList from "../components/Chat/ConversationList";
 import NewConversationModal from "../components/Chat/NewConversationModal";
 import type { IUser, IConversation } from "../service/chatService";
 import chatSocketService from "../socket/chatSocket";
-import Navbar from "../components/Navbar";
 import DeleteDialog from "../components/ui/DeleteDialog";
+import AdminLayout from "../layouts/Admin/AdminLayout";
 
 const MessengerPage: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -95,7 +95,7 @@ const MessengerPage: React.FC = () => {
               })
             );
           }
-        } catch {}
+        } catch { }
 
         const convList = conversationsRef.current || [];
         const activeConv = currentConversationRef.current;
@@ -112,7 +112,7 @@ const MessengerPage: React.FC = () => {
 
         // If active and focused, immediately mark as read to keep unread count accurate
         if (isActive && isWindowFocused) {
-          try { chatSocketService.markConversationAsRead(message.conversationId); } catch {}
+          try { chatSocketService.markConversationAsRead(message.conversationId); } catch { }
         }
 
         // Only toast if: not own, not muted, and either not viewing this convo or window not focused
@@ -173,7 +173,7 @@ const MessengerPage: React.FC = () => {
             if (activeConv?._id) {
               chatSocketService.markConversationAsRead(activeConv._id);
             }
-          } catch {}
+          } catch { }
         }, 1000);
       });
 
@@ -364,7 +364,7 @@ const MessengerPage: React.FC = () => {
     if (currentConversation) {
       try {
         chatSocketService.markConversationAsRead(currentConversation._id);
-      } catch {}
+      } catch { }
     }
   }, [currentConversation]);
 
@@ -435,7 +435,7 @@ const MessengerPage: React.FC = () => {
     if (currentConversation && currentConversation._id === updatedConversation._id) {
       dispatch(setCurrentConversation(updatedConversation));
     }
-    
+
     // Re-fetch conversations to ensure we have the latest data
     dispatch(fetchConversations());
   };
@@ -459,71 +459,69 @@ const MessengerPage: React.FC = () => {
   }
 
   return (
-    <>
-      <Navbar />
-      <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
-      {/* Conversation List Sidebar */}
-      <div
-        className={`fixed inset-y-0 left-0 z-40 w-80 bg-white dark:bg-gray-800 border-r border-gray-200/50 dark:border-gray-700/50 flex flex-col backdrop-blur-sm shadow-xl transform transition-transform duration-300 lg:static lg:translate-x-0 ${
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        {/* Header */}
-        <div className="p-6 border-b border-gray-200/50 dark:border-gray-700/50 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20">
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl shadow-lg">
-                <MessageCircle className="w-6 h-6 text-white" />
+    <AdminLayout>
+      <div className="flex h-[47rem] bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-900 dark:to-gray-800">
+        {/* Conversation List Sidebar */}
+        <div
+          className={`fixed inset-y-0 left-0 z-40 w-80 bg-white dark:bg-gray-800 border-r border-gray-200/50 dark:border-gray-700/50 flex flex-col backdrop-blur-sm shadow-xl transform transition-transform duration-300 lg:static lg:translate-x-0 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+            }`}
+        >
+          {/* Header */}
+          <div className="p-6 border-b border-gray-200/50 dark:border-gray-700/50 bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl shadow-lg">
+                  <MessageCircle className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-gray-800 dark:text-gray-200">Messenger</h1>
+                  {unreadTotal > 0 && (
+                    <div className="flex items-center gap-1 mt-1">
+                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                      <span className="text-xs text-red-600 dark:text-red-400 font-medium">
+                        {unreadTotal} unread
+                      </span>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div>
-                <h1 className="text-xl font-bold text-gray-800 dark:text-gray-200">Messenger</h1>
-                {unreadTotal > 0 && (
-                  <div className="flex items-center gap-1 mt-1">
-                    <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                    <span className="text-xs text-red-600 dark:text-red-400 font-medium">
-                      {unreadTotal} unread
-                    </span>
-                  </div>
-                )}
-              </div>
+              <button
+                onClick={() => setShowNewConversationModal(true)}
+                className="p-3 text-blue-600 dark:text-blue-400 hover:text-white hover:bg-gradient-to-r hover:from-blue-500 hover:to-purple-600 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
+                title="New conversation"
+              >
+                <Plus size={20} />
+              </button>
             </div>
-            <button
-              onClick={() => setShowNewConversationModal(true)}
-              className="p-3 text-blue-600 dark:text-blue-400 hover:text-white hover:bg-gradient-to-r hover:from-blue-500 hover:to-purple-600 rounded-xl transition-all duration-200 transform hover:scale-105 shadow-lg hover:shadow-xl"
-              title="New conversation"
-            >
-              <Plus size={20} />
-            </button>
+
+            {/* Search */}
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search conversations..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full px-4 py-3 pl-12 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
+              />
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              {searchQuery && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Search */}
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search conversations..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-4 py-3 pl-12 border border-gray-300 dark:border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 focus:border-transparent bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 transition-all duration-200"
-            />
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-            {searchQuery && (
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                <div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-              </div>
-            )}
-          </div>
+          <ConversationList
+            conversations={conversations}
+            currentConversation={currentConversation}
+            onConversationSelect={handleConversationSelect}
+            onConversationDelete={handleConversationDelete}
+            loading={loading}
+            currentUserId={user?.id || user?._id}
+            query={searchQuery}
+          />
         </div>
-
-        <ConversationList
-          conversations={conversations}
-          currentConversation={currentConversation}
-          onConversationSelect={handleConversationSelect}
-          onConversationDelete={handleConversationDelete}
-          loading={loading}
-          currentUserId={user?.id || user?._id}
-          query={searchQuery}
-        />
-      </div>
 
         {/* Mobile overlay */}
         {isSidebarOpen && (
@@ -533,104 +531,104 @@ const MessengerPage: React.FC = () => {
           />
         )}
 
-      {/* Chat Interface */}
-      <div className="flex-1 flex flex-col">
-        {currentConversation ? (
-          <ChatInterface
-            conversation={currentConversation}
-            messages={messages[currentConversation._id] || []}
-            typingUsers={typingUsers[currentConversation._id] || []}
-            onSendMessage={handleSendMessage}
-            onTyping={handleTyping}
-            onMessageReaction={handleMessageReaction}
-            onMessageEdit={handleMessageEdit}
-            onMessageDelete={handleMessageDelete}
-            onMarkAsRead={handleMarkAsRead}
-            onConversationUpdate={handleConversationUpdate}
-            currentUser={user}
-            onToggleSidebar={() => setIsSidebarOpen(true)}
-            onLoadOlder={loadOlder}
-            hasMoreOlder={hasMoreOlder}
-            isLoadingOlder={isLoadingOlder}
-          />
-        ) : (
-          <div className="flex-1 flex items-center justify-center p-8">
-            <div className="text-center max-w-md">
-              {/* Animated Icon */}
-              <div className="relative w-32 h-32 mx-auto mb-8">
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-purple-600 rounded-full opacity-20 animate-pulse"></div>
-                <div className="absolute inset-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-2xl">
-                  <MessageCircle className="w-12 h-12 text-white" />
-                </div>
-                <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg">
-                  <Sparkles className="w-4 h-4 text-white animate-spin" />
-                </div>
-              </div>
-
-              <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-3">
-                Welcome to your inbox
-              </h2>
-              <p className="text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
-                Select a conversation from the sidebar to start messaging, or create a new one to connect with friends and colleagues.
-              </p>
-
-              {/* Action Buttons */}
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <button
-                  onClick={() => setShowNewConversationModal(true)}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-200 transform hover:scale-105"
-                >
-                  <Plus size={18} />
-                  Start New Chat
-                </button>
-                <button
-                  onClick={() => setIsSidebarOpen(true)}
-                  className="inline-flex items-center gap-2 px-6 py-3 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded-xl font-semibold hover:bg-gray-50 dark:hover:bg-gray-600 transition-all duration-200 transform hover:scale-105"
-                >
-                  <Users size={18} />
-                  Browse Chats
-                </button>
-              </div>
-
-              {/* Stats or Recent Activity */}
-              <div className="mt-8 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm">
-                <div className="flex items-center justify-center gap-6 text-sm text-gray-500 dark:text-gray-400">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span>Online</span>
+        {/* Chat Interface */}
+        <div className="flex-1 flex flex-col">
+          {currentConversation ? (
+            <ChatInterface
+              conversation={currentConversation}
+              messages={messages[currentConversation._id] || []}
+              typingUsers={typingUsers[currentConversation._id] || []}
+              onSendMessage={handleSendMessage}
+              onTyping={handleTyping}
+              onMessageReaction={handleMessageReaction}
+              onMessageEdit={handleMessageEdit}
+              onMessageDelete={handleMessageDelete}
+              onMarkAsRead={handleMarkAsRead}
+              onConversationUpdate={handleConversationUpdate}
+              currentUser={user}
+              onToggleSidebar={() => setIsSidebarOpen(true)}
+              onLoadOlder={loadOlder}
+              hasMoreOlder={hasMoreOlder}
+              isLoadingOlder={isLoadingOlder}
+            />
+          ) : (
+            <div className="flex-1 flex items-center justify-center p-8">
+              <div className="text-center max-w-md">
+                {/* Animated Icon */}
+                <div className="relative w-32 h-32 mx-auto mb-8">
+                  <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-purple-600 rounded-full opacity-20 animate-pulse"></div>
+                  <div className="absolute inset-4 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center shadow-2xl">
+                    <MessageCircle className="w-12 h-12 text-white" />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <MessageCircle size={14} />
-                    <span>{conversations.length} conversations</span>
+                  <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg">
+                    <Sparkles className="w-4 h-4 text-white animate-spin" />
                   </div>
-                  {unreadTotal > 0 && (
+                </div>
+
+                <h2 className="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-3">
+                  Welcome to your inbox
+                </h2>
+                <p className="text-gray-600 dark:text-gray-400 mb-8 leading-relaxed">
+                  Select a conversation from the sidebar to start messaging, or create a new one to connect with friends and colleagues.
+                </p>
+
+                {/* Action Buttons */}
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <button
+                    onClick={() => setShowNewConversationModal(true)}
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl hover:from-blue-600 hover:to-purple-700 transition-all duration-200 transform hover:scale-105"
+                  >
+                    <Plus size={18} />
+                    Start New Chat
+                  </button>
+                  <button
+                    onClick={() => setIsSidebarOpen(true)}
+                    className="inline-flex items-center gap-2 px-6 py-3 bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-600 rounded-xl font-semibold hover:bg-gray-50 dark:hover:bg-gray-600 transition-all duration-200 transform hover:scale-105"
+                  >
+                    <Users size={18} />
+                    Browse Chats
+                  </button>
+                </div>
+
+                {/* Stats or Recent Activity */}
+                <div className="mt-8 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-2xl border border-gray-200/50 dark:border-gray-700/50 backdrop-blur-sm">
+                  <div className="flex items-center justify-center gap-6 text-sm text-gray-500 dark:text-gray-400">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                      <span>{unreadTotal} unread</span>
+                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                      <span>Online</span>
                     </div>
-                  )}
+                    <div className="flex items-center gap-2">
+                      <MessageCircle size={14} />
+                      <span>{conversations.length} conversations</span>
+                    </div>
+                    {unreadTotal > 0 && (
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                        <span>{unreadTotal} unread</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
+        </div>
+
+        {/* New Conversation Modal */}
+        {showNewConversationModal && (
+          <NewConversationModal
+            isOpen={showNewConversationModal}
+            onClose={() => setShowNewConversationModal(false)}
+            searchResults={searchResults}
+            selectedUsers={selectedUsers}
+            onUserSelect={(user: IUser) => dispatch(addSelectedUser(user))}
+            onUserRemove={(userId: string) => dispatch(removeSelectedUser(userId))}
+            onCreateConversation={handleNewConversation}
+            loading={loading}
+          />
         )}
-      </div>
 
-      {/* New Conversation Modal */}
-      {showNewConversationModal && (
-        <NewConversationModal
-          isOpen={showNewConversationModal}
-          onClose={() => setShowNewConversationModal(false)}
-          searchResults={searchResults}
-          selectedUsers={selectedUsers}
-          onUserSelect={(user: IUser) => dispatch(addSelectedUser(user))}
-          onUserRemove={(userId: string) => dispatch(removeSelectedUser(userId))}
-          onCreateConversation={handleNewConversation}
-          loading={loading}
-        />
-      )}
-
-      {/* Incoming call handled globally via GlobalCallManager */}
+        {/* Incoming call handled globally via GlobalCallManager */}
       </div>
 
       {/* Delete confirmation dialog */}
@@ -643,7 +641,7 @@ const MessengerPage: React.FC = () => {
         confirmText={isDeleting ? "Deleting..." : "Delete"}
         cancelText="Cancel"
       />
-    </>
+    </AdminLayout>
   );
 };
 
