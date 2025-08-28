@@ -65,6 +65,24 @@ const MessengerPage: React.FC = () => {
       document.title = base;
     }
   }, [unreadTotal]);
+
+  // Reset unread counts when page loads
+  useEffect(() => {
+    if (user && conversations.length > 0 && chatSocketService.markConversationAsRead) {
+      // Mark all conversations as read when visiting the messenger page
+      conversations.forEach(conversation => {
+        const uid = user?.id || (user as any)?._id;
+        if (conversation.unreadCount?.[uid] > 0) {
+          try {
+            chatSocketService.markConversationAsRead(conversation._id);
+          } catch (error) {
+            console.log('Could not mark conversation as read:', error);
+          }
+        }
+      });
+    }
+  }, [user, conversations]);
+
   // Live refs to avoid stale closures in socket listeners
   const conversationsRef = useRef(conversations);
   const currentConversationRef = useRef(currentConversation);

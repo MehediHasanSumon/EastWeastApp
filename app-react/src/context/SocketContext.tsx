@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { SOCKET_EVENTS, socketService, type ConversationData, type MessageData, type SocketUser } from "../service/socketService";
+import { ChatService, type IConversation } from "../service/chatService";
 
 interface SocketContextType {
   isConnected: boolean;
@@ -9,11 +10,14 @@ interface SocketContextType {
   messages: MessageData[];
   typingUsers: { [conversationId: string]: SocketUser[] };
   onlineUsers: string[];
+  unreadCount: number;
   sendMessage: (content: string, type?: "text" | "image" | "file" | "note") => void;
   joinConversation: (conversationId: string) => void;
   leaveConversation: (conversationId: string) => void;
   startTyping: (conversationId: string) => void;
   stopTyping: (conversationId: string) => void;
+  markConversationAsRead: (conversationId: string) => void;
+  loadConversations: () => Promise<void>;
 }
 
 const SocketContext = createContext<SocketContextType | null>(null);
@@ -38,9 +42,72 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
   const [messages, setMessages] = useState<MessageData[]>([]);
   const [typingUsers, setTypingUsers] = useState<{ [conversationId: string]: SocketUser[] }>({});
   const [onlineUsers, setOnlineUsers] = useState<string[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Calculate total unread count
+  const calculateUnreadCount = (conversations: ConversationData[]) => {
+    if (!user) return 0;
+    
+    return conversations.reduce((total, conversation) => {
+      const userId = user.id || user._id;
+      const userUnreadCount = conversation.unreadCount?.[userId] || 0;
+      return total + userUnreadCount;
+    }, 0);
+  };
+
+  // Load conversations from API
+  const loadConversations = async () => {
+    if (!user) return;
+    
+    try {
+      const apiConversations = await ChatService.getConversations();
+      
+      // Convert API conversations to SocketContext format
+      const socketConversations: ConversationData[] = apiConversations.map(conv => ({
+        id: conv._id,
+        name: conv.name,
+        participants: conv.participants.map(p => ({
+          id: p._id,
+          name: p.name,
+          avatar: p.avatar || "",
+          email: p.email
+        })),
+        lastMessage: conv.lastMessage ? {
+          id: conv.lastMessage._id,
+          conversationId: conv.lastMessage.conversationId,
+          sender: {
+            id: conv.lastMessage.sender._id,
+            name: conv.lastMessage.sender.name,
+            avatar: conv.lastMessage.sender.avatar || "",
+            email: conv.lastMessage.sender.email
+          },
+          content: conv.lastMessage.content,
+          type: conv.lastMessage.messageType as any,
+          createdAt: new Date(conv.lastMessage.createdAt),
+          readBy: conv.lastMessage.readBy || []
+        } : undefined,
+        unreadCount: conv.unreadCount || {},
+        isGroup: conv.type === "group"
+      }));
+      
+      setConversations(socketConversations);
+      
+      // Calculate and set unread count
+      const totalUnread = calculateUnreadCount(socketConversations);
+      setUnreadCount(totalUnread);
+    } catch (error) {
+      console.error("Error loading conversations:", error);
+    }
+  };
+
+  // Update unread count when conversations change
+  useEffect(() => {
+    const totalUnread = calculateUnreadCount(conversations);
+    setUnreadCount(totalUnread);
+  }, [conversations]);
 
   useEffect(() => {
-    if (user) {
+    if (user && user.id) { // Make sure user has a valid ID
       const socketUser: SocketUser = {
         id: user.id || user._id,
         name: user.name,
@@ -48,15 +115,28 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         email: user.email,
       };
 
-      socketService
-        .connect(socketUser)
-        .then(() => {
-          setIsConnected(true);
-          setupSocketListeners();
-        })
-        .catch((error) => {
-          console.error("Failed to connect to socket:", error);
-        });
+      // Load conversations first
+      loadConversations();
+
+      // Add a small delay to ensure authentication is complete
+      const connectTimeout = setTimeout(() => {
+        socketService
+          .connect(socketUser)
+          .then(() => {
+            setIsConnected(true);
+            setupSocketListeners();
+          })
+          .catch((error) => {
+            console.error("Failed to connect to socket:", error);
+            // Don't set isConnected to false here, let it retry
+          });
+      }, 1000); // Wait 1 second for authentication to complete
+
+      return () => {
+        clearTimeout(connectTimeout);
+        socketService.disconnect();
+        setIsConnected(false);
+      };
     }
 
     return () => {
@@ -70,9 +150,21 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     socketService.on(SOCKET_EVENTS.NEW_MESSAGE, (message: MessageData) => {
       setMessages((prev) => [...prev, message]);
 
-      // Update conversation's last message
+      // Update conversation's last message and increment unread count
       setConversations((prev) =>
-        prev.map((conv) => (conv.id === message.conversationId ? { ...conv, lastMessage: message } : conv))
+        prev.map((conv) => {
+          if (conv.id === message.conversationId) {
+            const isCurrentUser = message.sender.id === (user?.id || user?._id);
+            const newUnreadCount = isCurrentUser ? conv.unreadCount : (conv.unreadCount || 0) + 1;
+            
+            return { 
+              ...conv, 
+              lastMessage: message,
+              unreadCount: newUnreadCount
+            };
+          }
+          return conv;
+        })
       );
     });
 
@@ -86,6 +178,25 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       setMessages((prev) =>
         prev.map((msg) => (msg.id === data.messageId ? { ...msg, readBy: [...msg.readBy, data.userId] } : msg))
       );
+
+      // Update unread count when message is read
+      if (data.userId === (user?.id || user?._id)) {
+        setConversations((prev) =>
+          prev.map((conv) => {
+            if (conv.id === data.conversationId) {
+              return { ...conv, unreadCount: Math.max(0, (conv.unreadCount || 0) - 1) };
+            }
+            return conv;
+          })
+        );
+      }
+    });
+
+    // Listen for unread count updates from backend
+    socketService.on("unread_counts_updated", (data: any) => {
+      console.log("Unread counts updated:", data);
+      // Reload conversations to get updated unread counts
+      loadConversations();
     });
 
     // Typing indicators
@@ -146,6 +257,11 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     const conversation = conversations.find((c) => c.id === conversationId);
     setActiveConversation(conversation || null);
 
+    // Mark conversation as read when joining
+    if (conversation) {
+      markConversationAsRead(conversationId);
+    }
+
     // Load messages for this conversation (you might want to implement this API call)
     // loadConversationMessages(conversationId);
   };
@@ -166,6 +282,28 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     socketService.stopTyping(conversationId);
   };
 
+  const markConversationAsRead = (conversationId: string) => {
+    // Update local state immediately
+    setConversations((prev) =>
+      prev.map((conv) => {
+        if (conv.id === conversationId) {
+          const userId = user?.id || user?._id;
+          return { 
+            ...conv, 
+            unreadCount: { 
+              ...conv.unreadCount, 
+              [userId]: 0 
+            } 
+          };
+        }
+        return conv;
+      })
+    );
+
+    // Emit socket event to mark messages as read
+    socketService.markMessageAsRead(conversationId, '');
+  };
+
   const value: SocketContextType = {
     isConnected,
     conversations,
@@ -173,11 +311,14 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
     messages,
     typingUsers,
     onlineUsers,
+    unreadCount,
     sendMessage,
     joinConversation,
     leaveConversation,
     startTyping,
     stopTyping,
+    markConversationAsRead,
+    loadConversations,
   };
 
   return <SocketContext.Provider value={value}>{children}</SocketContext.Provider>;

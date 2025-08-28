@@ -1,4 +1,6 @@
 import io from "socket.io-client";
+import { getCookie } from "../utils/Storage";
+import { hexToString } from "../utils/Lib";
 
 export interface SocketUser {
   id: string;
@@ -23,7 +25,7 @@ export interface ConversationData {
   name?: string;
   participants: SocketUser[];
   lastMessage?: MessageData;
-  unreadCount: number;
+  unreadCount: { [userId: string]: number };
   isGroup: boolean;
 }
 
@@ -46,26 +48,68 @@ export const SOCKET_EVENTS = {
 
 class SocketService {
   private socket: any | null = null;
+  private user: SocketUser | null = null;
+  private reconnectAttempts = 0;
+  private maxReconnectAttempts = 5;
+  private reconnectDelay = 1000;
 
   connect(user: SocketUser): Promise<any> {
     return new Promise((resolve, reject) => {
       try {
         this.user = user;
 
+        // Get authentication tokens
+        const accessToken = getCookie("at_");
+        const refreshToken = getCookie("rt");
+        
+        if (!accessToken && !refreshToken) {
+          reject(new Error("No authentication tokens found"));
+          return;
+        }
+
+        // Decode refresh token if needed
+        const decodedRefreshToken = refreshToken ? hexToString(refreshToken) : null;
+
         this.socket = io(import.meta.env.VITE_BACKEND_HOST || "http://localhost:8000", {
-          auth: { user },
+          auth: { 
+            user,
+            accessToken: accessToken || decodedRefreshToken,
+            refreshToken: decodedRefreshToken
+          },
           transports: ["websocket", "polling"],
           withCredentials: true,
+          timeout: 10000,
+          forceNew: true,
         });
 
         this.socket.on("connect", () => {
           console.log("Connected to socket server");
+          this.reconnectAttempts = 0; // Reset reconnect attempts on successful connection
           resolve(this.socket!);
         });
 
-        this.socket.on("connect_error", (error) => {
+        this.socket.on("connect_error", (error: any) => {
           console.error("Socket connection error:", error);
-          reject(error);
+          
+          // Handle authentication errors specifically
+          if (error.message === "Authentication error" || error.data?.message === "Authentication error") {
+            console.log("Authentication failed, will retry after token refresh");
+            // Don't reject immediately for auth errors, let the app handle token refresh
+            setTimeout(() => {
+              this.attemptReconnect(resolve, reject);
+            }, 2000);
+          } else {
+            // For other errors, attempt reconnection
+            this.attemptReconnect(resolve, reject);
+          }
+        });
+
+        this.socket.on("disconnect", (reason: string) => {
+          console.log("Socket disconnected:", reason);
+          if (reason === "io server disconnect") {
+            // Server disconnected, try to reconnect
+            this.attemptReconnect(resolve, reject);
+          }
         });
 
         this.setupEventListeners();
@@ -75,10 +119,30 @@ class SocketService {
     });
   }
 
+  private attemptReconnect(resolve: any, reject: any) {
+    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+      reject(new Error("Max reconnection attempts reached"));
+      return;
+    }
+
+    this.reconnectAttempts++;
+    console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
+
+    setTimeout(() => {
+      if (this.user) {
+        this.connect(this.user)
+          .then(resolve)
+          .catch(reject);
+      } else {
+        reject(new Error("No user data for reconnection"));
+      }
+    }, this.reconnectDelay * this.reconnectAttempts);
+  }
+
   private setupEventListeners() {
     if (!this.socket) return;
 
-    this.socket.on(SOCKET_EVENTS.ERROR, (data) => {
+    this.socket.on(SOCKET_EVENTS.ERROR, (data: any) => {
       console.error("Socket error:", data);
     });
   }
@@ -88,6 +152,8 @@ class SocketService {
       this.socket.disconnect();
       this.socket = null;
     }
+    this.user = null;
+    this.reconnectAttempts = 0;
   }
 
   // Room Management

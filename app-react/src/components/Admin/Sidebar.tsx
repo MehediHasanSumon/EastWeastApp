@@ -11,6 +11,7 @@ import {
 import { FiHome, FiMessageCircle, FiPieChart } from "react-icons/fi";
 import type { IconType } from "react-icons/lib";
 import { useSelector } from "react-redux";
+import { useSocket } from "../../context/SocketContext";
 import type { RootState } from "../../interface/types";
 import NavItem from "./NavItem";
 import SubMenu from "./SubMenu";
@@ -41,6 +42,7 @@ const Sidebar = ({
   setSidebarOpen: (value: boolean) => void;
 }) => {
   const { user } = useSelector((state: RootState) => state.auth);
+  const { unreadCount } = useSocket();
 
   const hasPermission = (permissionName?: string) => {
     if (!permissionName) return true;
@@ -58,7 +60,7 @@ const Sidebar = ({
       label: "Messages",
       to: "/messenger",
       icon: FiMessageCircle,
-      badge: 3,
+      badge: unreadCount > 0 ? unreadCount : undefined,
       // permission: "view-messages",
     },
     {
