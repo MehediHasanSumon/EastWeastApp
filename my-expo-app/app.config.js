@@ -26,13 +26,7 @@ export default {
         "READ_MEDIA_IMAGES",
         "READ_EXTERNAL_STORAGE", 
         "CAMERA", 
-        "AUDIO_RECORDING",
-        "RECORD_AUDIO",
-        "MODIFY_AUDIO_SETTINGS",
-        "VIBRATE",
-        "INTERNET",
-        "ACCESS_NETWORK_STATE",
-        "WAKE_LOCK"
+        "AUDIO_RECORDING"
       ]
     },
     web: {
@@ -45,6 +39,7 @@ export default {
     extra: {
       // Environment variables
       EXPO_PUBLIC_BACKEND_HOST: process.env.EXPO_PUBLIC_BACKEND_HOST,
+      EXPO_PUBLIC_SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL,
       NODE_ENV: process.env.NODE_ENV || "development"
     }
   }

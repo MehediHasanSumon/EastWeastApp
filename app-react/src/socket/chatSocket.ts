@@ -55,6 +55,10 @@ class ChatSocketService {
       this.isConnected = true;
       this.reconnectAttempts = 0;
       this.emit("socket_connected");
+      
+      // Set user online immediately when connected
+      this.socket!.emit('user_online');
+      
       // Flush pending read acknowledgements
       try {
         if (this.pendingReadConversationIds.size) {
@@ -290,10 +294,30 @@ class ChatSocketService {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     
-    // Set online when page loads
+    // Set online when page loads if not hidden
     if (!document.hidden && this.socket && this.isConnected) {
       this.socket.emit('user_online');
     }
+
+    // Handle page unload
+    window.addEventListener('beforeunload', () => {
+      if (this.socket && this.isConnected) {
+        this.socket.emit('user_offline');
+      }
+    });
+
+    // Handle focus/blur events for additional reliability
+    window.addEventListener('focus', () => {
+      if (this.socket && this.isConnected) {
+        this.socket.emit('user_online');
+      }
+    });
+
+    window.addEventListener('blur', () => {
+      if (this.socket && this.isConnected) {
+        this.socket.emit('user_offline');
+      }
+    });
   }
 
   setUserOnline() {

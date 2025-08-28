@@ -1,3 +1,4 @@
+// App.tsx
 import { NavigationContainer } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -9,7 +10,7 @@ import './global.css';
 // Auth Context
 import { AuthProvider } from './context/AuthContext';
 import ThemeProvider from './context/ThemeContext';
-
+import { ChatProvider } from './context/ChatContext';
 import { ToastProvider } from './context/ToastContext';
 
 // Store
@@ -28,12 +29,12 @@ import EmployeeScreen from './screens/EmployeeScreen';
 import InvoiceDetailScreen from './screens/InvoiceDetailScreen';
 import LoginScreen from './screens/LoginScreen';
 import MakeInvoiceScreen from './screens/MakeInvoiceScreen';
-
 import PrintMakeInvoiceScreen from './screens/PrintMakeInvoiceScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import SettingsScreen from './screens/SettingsScreen';
-import MessengerScreen from './screens/MessengerScreen';
-
+import ConversationListScreen from './screens/ConversationListScreen';
+import ChatScreen from './screens/ChatScreen';
+import NewConversationScreen from './screens/NewConversationScreen';
 
 // Types
 import CreateProduct from 'components/CreateProduct';
@@ -78,7 +79,6 @@ const AppNavigator = () => {
             component={DashboardScreen}
             options={{ headerShown: false }}
           />
-
           <Stack.Screen name="Profile" component={ProfileScreen} />
           <Stack.Screen
             name="EditProfile"
@@ -129,7 +129,21 @@ const AppNavigator = () => {
             options={{ title: 'Invoice Details' }}
           />
           <Stack.Screen name="Settings" component={SettingsScreen} />
-          <Stack.Screen name="Messenger" component={MessengerScreen} />
+          <Stack.Screen 
+            name="ConversationList" 
+            component={ConversationListScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="ChatScreen" 
+            component={ChatScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen 
+            name="NewConversationScreen" 
+            component={NewConversationScreen}
+            options={{ headerShown: false }}
+          />
         </>
       )}
     </Stack.Navigator>
@@ -141,11 +155,13 @@ export default function App() {
     <Provider store={store}>
       <ThemeProvider>
         <AuthProvider>
-          <ToastProvider>
-            <NavigationContainer>
-              <AppNavigator />
-            </NavigationContainer>
-          </ToastProvider>
+          <ChatProvider>
+            <ToastProvider>
+              <NavigationContainer>
+                <AppNavigator />
+              </NavigationContainer>
+            </ToastProvider>
+          </ChatProvider>
         </AuthProvider>
       </ThemeProvider>
     </Provider>

@@ -1,23 +1,36 @@
 import axios, { AxiosInstance } from 'axios';
 import { Platform } from 'react-native';
 import { getAccessToken, getRefreshToken, getDeviceId, saveTokens, saveUser, clearAuth } from './authStorage';
-import { ENV } from '../config/environment';
+import Constants from 'expo-constants';
 
 // Configure your backend host via env or fallback suitable for real devices/emulators
 function resolveBaseUrl(): string {
-  // Use environment config first
-  if (ENV.BACKEND_HOST) return ENV.BACKEND_HOST;
+  // Try to get from app config first (for production builds)
+  const appConfig = Constants.expoConfig?.extra;
+  const envBackendHost = appConfig?.EXPO_PUBLIC_BACKEND_HOST || process.env.EXPO_PUBLIC_BACKEND_HOST || process.env.BACKEND_HOST;
+  
+  if (envBackendHost) return envBackendHost;
   
   // Production fallback
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.NODE_ENV === 'production' || appConfig?.NODE_ENV === 'production') {
     return 'https://your-production-domain.com'; // Update this with your actual production domain
   }
   
   // Prefer emulator loopback for Android emulators
   if (Platform.OS === 'android') return 'http://10.0.2.2:8000';
   
-  // iOS simulator fallback
-  if (Platform.OS === 'ios') return 'http://localhost:8000';
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const Constants = require('expo-constants').default;
+    const hostUri: string | undefined =
+      Constants?.expoConfig?.hostUri ||
+      (Constants as any)?.manifest?.debuggerHost ||
+      (Constants as any)?.manifest2?.extra?.expoClient?.hostUri;
+    if (hostUri) {
+      const host = hostUri.split(':')[0];
+      return `http://${host}:8000`;
+    }
+  } catch {}
   
   return 'http://localhost:8000';
 }
