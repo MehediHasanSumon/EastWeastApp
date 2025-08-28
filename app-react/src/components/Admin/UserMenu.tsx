@@ -8,6 +8,7 @@ import { logout } from "../../app/features/auth/authSlice";
 import request from "../../service/AxiosInstance";
 import { removeAuthCookies } from "../../utils/AuthLib";
 import { toastError } from "../../utils/Toast";
+import { getProfileImageUrl, handleProfileImageError } from "../../utils/profileImage";
 import Loading from "../Loading";
 import type { RootState } from "../../app/Store";
 
@@ -51,9 +52,10 @@ const UserMenu = () => {
         aria-label="User Menu"
       >
         <img
-          src={user ? "https://i.pravatar.cc/150?img=30" : undefined}
+          src={getProfileImageUrl(user?.profile_picture, user?.name)}
           alt="User Avatar"
-          className="w-8 h-8 rounded-full ring-2 ring-indigo-500 dark:ring-indigo-400 hover:ring-4 transition-all duration-300"
+          className="w-8 h-8 rounded-full ring-2 ring-indigo-500 dark:ring-indigo-400 hover:ring-4 transition-all duration-300 object-cover"
+          onError={handleProfileImageError}
         />
       </button>
 

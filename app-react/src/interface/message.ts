@@ -4,10 +4,7 @@ export interface User {
   email: string;
   online?: boolean;
   avatar?: string;
-  profile_picture?: {
-    image?: string;
-    publicId?: string;
-  };
+  profile_picture?: string;
   phone?: string;
 }
 

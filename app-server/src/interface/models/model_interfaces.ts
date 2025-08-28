@@ -11,10 +11,7 @@ export interface IUser extends Document {
   permissions: Types.ObjectId[] | IPermission[];
   address?: string;
   phone?: string;
-  profile_picture?: {
-    image: string;
-    publicId: string;
-  };
+  profile_picture?: string;
   bio?: string;
   date_of_birth?: Date;
   profession?: string;

@@ -357,20 +357,28 @@ export const updateMyAvatar = async (req: Request, res: Response): Promise<Respo
     }
 
     // Remove old file if exists
-    if (user.profile_picture?.publicId) {
+    if (user.profile_picture) {
       try {
         const fs = await import('fs');
         const path = await import('path');
         const uploadsRoot = process.env.UPLOAD_DIR || path.join(process.cwd(), 'uploads');
-        const oldPath = path.join(uploadsRoot, 'avatars', user.profile_picture.publicId);
-        if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-      } catch {}
+        
+        // Extract filename from the stored path (e.g., "/uploads/avatars/filename.jpg" -> "filename.jpg")
+        const oldFilename = user.profile_picture.split('/').pop();
+        if (oldFilename) {
+          const oldPath = path.join(uploadsRoot, 'avatars', oldFilename);
+          if (fs.existsSync(oldPath)) {
+            fs.unlinkSync(oldPath);
+            console.log(`Deleted old profile picture: ${oldPath}`);
+          }
+        }
+      } catch (error) {
+        console.error('Error deleting old profile picture:', error);
+        // Continue with upload even if deletion fails
+      }
     }
 
-    user.profile_picture = {
-      image: `/uploads/avatars/${file.filename}`,
-      publicId: file.filename,
-    } as any;
+    user.profile_picture = `/uploads/avatars/${file.filename}`;
     await user.save();
 
     const safeUser = await User.findById(userId).select('-password').populate('roles');

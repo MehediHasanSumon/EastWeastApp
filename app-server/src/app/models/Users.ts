@@ -10,10 +10,7 @@ const UserSchema: Schema<IUser> = new Schema(
     roles: [{ type: Schema.Types.ObjectId, ref: "Role" }],
     address: { type: String, default: null },
     phone: { type: String, default: null },
-    profile_picture: {
-      image: { type: String, default: null },
-      publicId: { type: String, default: null },
-    },
+    profile_picture: { type: String, default: null },
     bio: { type: String, default: null },
     date_of_birth: { type: Date, default: null },
     profession: { type: String, default: null },

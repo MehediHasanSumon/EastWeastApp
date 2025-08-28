@@ -1,5 +1,6 @@
 import { Request, Response, Router } from "express";
 import { getUserAccessToken, loginUser, registerNewUser, updateMyAvatar, updateMyProfile, userLogout } from "../app/controllers/Auth/auth.controller";
+import { updateProfile, updateEmail, updatePassword, getProfile } from "../app/controllers/Auth/account.controller";
 import { uploadAvatar } from "../middlewares/upload";
 import { checkResetPasswordToken, confirmPassword, forgetPassword } from "../app/controllers/Auth/ResetPasswordController";
 import { sendEmailVetificationToken, userEmailVetification } from "../app/controllers/Auth/verifyEmailController";
@@ -37,5 +38,11 @@ route.get("/me", isLoggedIn, (req: Request, res: Response) => {
 
 route.put('/me', isLoggedIn, updateMyProfile);
 route.post('/me/avatar', isLoggedIn, uploadAvatar.single('avatar'), updateMyAvatar);
+
+// Account management routes
+route.get('/me/profile', isLoggedIn, getProfile);
+route.put('/me/profile', isLoggedIn, updateProfile);
+route.put('/me/email', isLoggedIn, updateEmail);
+route.put('/me/password', isLoggedIn, updatePassword);
 
 export default route;

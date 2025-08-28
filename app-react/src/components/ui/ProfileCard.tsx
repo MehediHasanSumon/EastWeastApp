@@ -1,15 +1,10 @@
 import React from "react";
 import { getProfileImage } from "../../utils/utils";
 
-export interface ProfilePicture {
-  image: string;
-  publicId: string;
-}
-
 export interface User {
   _id: string;
   name: string;
-  profile_picture: ProfilePicture | null;
+  profile_picture: string | null;
   bio: string | null;
   profession: string | null;
 }

@@ -1,15 +1,10 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 
-export interface ProfilePicture {
-  image: string;
-  publicId: string;
-}
-
 export interface User {
   _id: string;
   name: string;
-  profile_picture: ProfilePicture | null;
+  profile_picture: string | null;
   bio: string | null;
   profession: string | null;
 }
@@ -92,5 +87,5 @@ export function formatTimestampToDate(timestamp: string): string {
 }
 
 export const getProfileImage = (user: User) => {
-  return user.profile_picture?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`;
+  return user.profile_picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&background=random`;
 };

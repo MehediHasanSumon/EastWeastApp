@@ -44,7 +44,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
       const socketUser: SocketUser = {
         id: user.id || user._id,
         name: user.name,
-        avatar: user.profile_picture?.image || "",
+        avatar: user.profile_picture || "",
         email: user.email,
       };
 
@@ -128,7 +128,7 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
         sender: {
           id: user.id || user._id,
           name: user.name,
-          avatar: user.profile_picture?.image || "",
+          avatar: user.profile_picture || "",
           email: user.email,
         },
         content,
