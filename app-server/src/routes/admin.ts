@@ -31,6 +31,12 @@ import {
   getCustomerAnalysisReport,
 } from "../app/controllers/Admin/report.controller";
 import {
+  getDashboardStats,
+  getDashboardSummary,
+  getDashboardAnalytics,
+  getDashboardOverview,
+} from "../app/controllers/Admin/dashboard.controller";
+import {
   createOrUpdateSMSTemplate,
   getAllSMSTemplates,
   getSMSTemplateById,
@@ -72,6 +78,12 @@ route.get("/reports/detailed", getDetailedReport);
 route.get("/reports/export", exportReport);
 route.get("/reports/product-performance", getProductPerformanceReport);
 route.get("/reports/customer-analysis", getCustomerAnalysisReport);
+
+// Dashboard
+route.get("/dashboard/stats", getDashboardStats);
+route.get("/dashboard/summary", getDashboardSummary);
+route.get("/dashboard/analytics", getDashboardAnalytics);
+route.get("/dashboard/overview", getDashboardOverview);
 
 // SMS Settings
 route.post("/sms-template", createOrUpdateSMSTemplate);

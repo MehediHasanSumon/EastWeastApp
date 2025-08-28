@@ -147,7 +147,7 @@ margin-right: -25px;
       <div class="info-row"><span class="label">Mobile Number:</span><span>${customerMobile}</span></div>
       <div class="info-row"><span class="label">Payment Method:</span><span>${paymentMethod}</span></div>
       <div class="info-row"><span class="label">Product:</span><span>${product}</span></div>
-      <div class="info-row"><span class="label">Discount:</span><span>BDT ${parseFloat(discount || '0').toFixed(2)}</span></div>
+      <div class="info-row"><span class="label">Discount:</span><span>BDT ৳{parseFloat(discount || '0').toFixed(2)}</span></div>
     </div>
 
     <table>
@@ -163,8 +163,8 @@ margin-right: -25px;
         <tr>
           <td>${product}</td>
           <td>${quantity}</td>
-          <td>BDT ${parseFloat(price).toFixed(2)}</td>
-          <td>BDT ${(parseFloat(price) * parseFloat(quantity) - parseFloat(discount || '0')).toFixed(2)}</td>
+          <td>BDT ৳{parseFloat(price).toFixed(2)}</td>
+          <td>BDT ৳{(parseFloat(price) * parseFloat(quantity) - parseFloat(discount || '0')).toFixed(2)}</td>
         </tr>
       </tbody>
     </table>

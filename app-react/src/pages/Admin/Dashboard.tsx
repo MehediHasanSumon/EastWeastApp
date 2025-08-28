@@ -7,7 +7,7 @@ const Dashboard = () => {
   // const stats = [
   //   {
   //     title: "Total Revenue",
-  //     value: "$24,780",
+  //     value: "৳24,780",
   //     change: "+12.5%",
   //     icon: "currency-dollar",
   //   },

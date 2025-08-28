@@ -160,12 +160,12 @@ const InvoiceDetailScreen = () => {
             
             <View className="flex-row justify-between">
               <Text className="text-gray-600 font-medium">Purchase Price:</Text>
-              <Text className="text-gray-800 font-semibold">${invoice.product.purchases}</Text>
+              <Text className="text-gray-800 font-semibold">৳{invoice.product.purchases}</Text>
             </View>
             
             <View className="flex-row justify-between">
               <Text className="text-gray-600 font-medium">Selling Price:</Text>
-              <Text className="text-gray-800 font-semibold">${invoice.product.sell}</Text>
+              <Text className="text-gray-800 font-semibold">৳{invoice.product.sell}</Text>
             </View>
           </View>
         </View>
@@ -177,7 +177,7 @@ const InvoiceDetailScreen = () => {
           <View className="space-y-3">
             <View className="flex-row justify-between">
               <Text className="text-gray-600 font-medium">Price:</Text>
-              <Text className="text-gray-800 font-semibold">${invoice.price}</Text>
+              <Text className="text-gray-800 font-semibold">৳{invoice.price}</Text>
             </View>
             
             <View className="flex-row justify-between">
@@ -187,12 +187,12 @@ const InvoiceDetailScreen = () => {
             
             <View className="flex-row justify-between">
               <Text className="text-gray-600 font-medium">Discount:</Text>
-              <Text className="text-gray-800 font-semibold">${invoice.discount}</Text>
+              <Text className="text-gray-800 font-semibold">৳{invoice.discount}</Text>
             </View>
             
             <View className="flex-row justify-between">
               <Text className="text-gray-600 font-medium">Total Amount:</Text>
-              <Text className="text-2xl font-bold text-green-600">${invoice.total_amount.toFixed(2)}</Text>
+              <Text className="text-2xl font-bold text-green-600">৳{invoice.total_amount.toFixed(2)}</Text>
             </View>
             
             <View className="flex-row justify-between">
@@ -210,7 +210,7 @@ const InvoiceDetailScreen = () => {
             <View className="space-y-3">
               <View className="flex-row justify-between">
                 <Text className="text-gray-600 font-medium">Profit:</Text>
-                <Text className="text-2xl font-bold text-green-600">${invoice.profit.toFixed(2)}</Text>
+                <Text className="text-2xl font-bold text-green-600">৳{invoice.profit.toFixed(2)}</Text>
               </View>
               
               <View className="flex-row justify-between">

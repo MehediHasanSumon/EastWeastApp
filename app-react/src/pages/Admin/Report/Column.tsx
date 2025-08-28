@@ -103,7 +103,7 @@ export const getColumns = (): Column<Invoice>[] => [
       if (!row?.total_amount) return <span className="text-gray-400">N/A</span>;
       return (
         <span className="font-semibold text-gray-600">
-          ${row.total_amount.toFixed(2)}
+          ৳{row.total_amount.toFixed(2)}
         </span>
       );
     },

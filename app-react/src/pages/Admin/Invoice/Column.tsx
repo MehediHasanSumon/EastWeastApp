@@ -97,7 +97,7 @@ export const getColumns = ({
       cell: (row) => (
         <div className="text-right">
           <div className="font-medium text-gray-900 dark:text-gray-100">
-            ${row.total_amount.toFixed(2)}
+            ৳{row.total_amount.toFixed(2)}
           </div>
         </div>
       ),

@@ -99,10 +99,6 @@ export async function getRefreshToken(): Promise<string | null> {
   return refreshToken;
 }
 
-// Add function specifically for socket authentication (following web app pattern)
-export async function getSocketAuthToken(): Promise<string | null> {
-  const { refreshToken } = await loadTokens();
-  return refreshToken; // Use refresh token for socket auth like web app
-}
+
 
 

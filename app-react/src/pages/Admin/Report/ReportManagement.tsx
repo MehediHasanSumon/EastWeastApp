@@ -348,7 +348,7 @@ const ReportManagement = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Total Revenue</p>
-                <p className="text-2xl font-semibold text-gray-900">${stats.totalRevenue.toFixed(2)}</p>
+                <p className="text-2xl font-semibold text-gray-900">৳{stats.totalRevenue.toFixed(2)}</p>
               </div>
             </div>
           </div>
@@ -360,7 +360,7 @@ const ReportManagement = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Total Profit</p>
-                <p className="text-2xl font-semibold text-gray-900">${stats.totalProfit.toFixed(2)}</p>
+                <p className="text-2xl font-semibold text-gray-900">৳{stats.totalProfit.toFixed(2)}</p>
               </div>
             </div>
           </div>
@@ -372,7 +372,7 @@ const ReportManagement = () => {
               </div>
               <div className="ml-4">
                 <p className="text-sm font-medium text-gray-600">Avg Order Value</p>
-                <p className="text-2xl font-semibold text-gray-900">${stats.averageOrderValue.toFixed(2)}</p>
+                <p className="text-2xl font-semibold text-gray-900">৳{stats.averageOrderValue.toFixed(2)}</p>
               </div>
             </div>
           </div>

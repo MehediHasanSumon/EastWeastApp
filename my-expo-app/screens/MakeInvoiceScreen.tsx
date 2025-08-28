@@ -443,7 +443,7 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
                 {products.map((product) => (
                   <Picker.Item
                     key={product._id}
-                    label={`${product.name} - $${product.sell}`}
+                    label={`${product.name} - ৳${product.sell}`}
                     value={product._id}
                   />
                 ))}

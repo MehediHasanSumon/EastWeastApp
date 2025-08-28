@@ -236,16 +236,16 @@ export default function ProductsScreen() {
           <View className="flex-row mt-3 space-x-4">
             <View>
               <Text className="text-xs text-gray-500">Purchase Price</Text>
-              <Text className="text-sm font-semibold text-gray-800">${item.purchases}</Text>
+              <Text className="text-sm font-semibold text-gray-800">৳{item.purchases}</Text>
             </View>
             <View>
               <Text className="text-xs text-gray-500">Sell Price</Text>
-              <Text className="text-sm font-semibold text-gray-800">${item.sell}</Text>
+              <Text className="text-sm font-semibold text-gray-800">৳{item.sell}</Text>
             </View>
             <View>
               <Text className="text-xs text-gray-500">Profit</Text>
               <Text className="text-sm font-semibold text-green-600">
-                ${(item.sell - item.purchases).toFixed(2)}
+                ৳{(item.sell - item.purchases).toFixed(2)}
               </Text>
             </View>
           </View>
@@ -575,18 +575,18 @@ export default function ProductsScreen() {
                 
                 <View>
                   <Text className="text-sm font-semibold text-gray-700 mb-2">Purchase Price</Text>
-                  <Text className="text-lg text-gray-800">${formData.purchases}</Text>
+                  <Text className="text-lg text-gray-800">৳{formData.purchases}</Text>
                 </View>
                 
                 <View>
                   <Text className="text-sm font-semibold text-gray-700 mb-2">Sell Price</Text>
-                  <Text className="text-lg text-gray-800">${formData.sell}</Text>
+                  <Text className="text-lg text-gray-800">৳{formData.sell}</Text>
                 </View>
                 
                 <View>
                   <Text className="text-sm font-semibold text-gray-700 mb-2">Profit Margin</Text>
                   <Text className="text-lg text-green-600">
-                    ${(parseFloat(formData.sell) - parseFloat(formData.purchases)).toFixed(2)}
+                    ৳{(parseFloat(formData.sell) - parseFloat(formData.purchases)).toFixed(2)}
                   </Text>
                 </View>
                 

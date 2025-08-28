@@ -40,7 +40,7 @@ export const getColumns = ({
     accessor: "purchases",
     cell: (row) => (
       <div className="text-sm text-gray-600 dark:text-gray-400">
-        ${row.purchases.toFixed(2)}
+        ৳{row.purchases.toFixed(2)}
       </div>
     ),
   },
@@ -49,7 +49,7 @@ export const getColumns = ({
     accessor: "sell",
     cell: (row) => (
       <div className="text-sm text-gray-600 dark:text-gray-400">
-        ${row.sell.toFixed(2)}
+        ৳{row.sell.toFixed(2)}
       </div>
     ),
   },

@@ -52,7 +52,7 @@ const InvoicePreview = ({
     { label: 'Mobile Number:', value: customerMobile },
     { label: 'Payment Method:', value: paymentMethod },
     { label: 'Product:', value: product },
-    { label: 'Discount:', value: `BDT ${!isNaN(discountNum) ? discountNum.toFixed(2) : '0.00'}` },
+    { label: 'Discount:', value: `BDT ৳${!isNaN(discountNum) ? discountNum.toFixed(2) : '0.00'}` },
   ];
 
   return (

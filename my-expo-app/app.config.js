@@ -45,7 +45,6 @@ export default {
     extra: {
       // Environment variables
       EXPO_PUBLIC_BACKEND_HOST: process.env.EXPO_PUBLIC_BACKEND_HOST,
-      EXPO_PUBLIC_SOCKET_URL: process.env.EXPO_PUBLIC_SOCKET_URL,
       NODE_ENV: process.env.NODE_ENV || "development"
     }
   }

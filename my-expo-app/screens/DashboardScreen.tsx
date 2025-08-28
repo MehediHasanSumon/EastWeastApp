@@ -6,7 +6,7 @@ import { RootStackParamList, SafeRoutes } from '../types/types';
 
 type DashboardItem = {
   title: string;
-  route: SafeRoutes | 'Messages';
+  route: SafeRoutes;
   icon: any;
 };
 
@@ -24,8 +24,9 @@ const dashboardItems: DashboardItem[] = [
   { title: 'Products', route: 'Products', icon: require('../assets/product.png') },
   { title: 'Employee', route: 'Employee', icon: require('../assets/employee.png') },
   { title: 'Make Invoice', route: 'MakeInvoice', icon: require('../assets/invoice.png') },
+  { title: 'Messenger', route: 'Messenger', icon: require('../assets/profile.png') },
   { title: 'General Settings', route: 'Settings', icon: require('../assets/settings.png') },
-  { title: 'Messages', route: 'Messenger', icon: require('../assets/convartion.png') },
+
 ];
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Dashboard'>;

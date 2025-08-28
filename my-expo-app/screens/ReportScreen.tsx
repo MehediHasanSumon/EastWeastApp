@@ -305,12 +305,12 @@ export default function ReportScreen() {
           <Text className="text-xs text-gray-500">{item.customer_phone_number}</Text>
         </View>
         <View className="items-end">
-          <Text className="font-bold text-green-600">${item.total_amount.toFixed(2)}</Text>
+          <Text className="font-bold text-green-600">৳{item.total_amount.toFixed(2)}</Text>
           <Text className="text-xs text-gray-500 capitalize">{item.payment_method}</Text>
           {item.profit !== undefined && (
             <View className="mt-1 px-2 py-1 rounded-full bg-blue-100">
               <Text className="text-xs font-medium text-blue-800">
-                Profit: ${item.profit.toFixed(2)}
+                Profit: ৳{item.profit.toFixed(2)}
               </Text>
             </View>
           )}
@@ -372,18 +372,18 @@ export default function ReportScreen() {
               </View>
               <View className="flex-1 bg-white rounded-lg p-4 shadow">
                 <Text className="text-sm text-gray-600">Total Revenue</Text>
-                <Text className="text-2xl font-bold text-green-600">${stats.totalRevenue.toFixed(2)}</Text>
+                <Text className="text-2xl font-bold text-green-600">৳{stats.totalRevenue.toFixed(2)}</Text>
               </View>
             </View>
             
             <View className="flex-row space-x-3">
               <View className="flex-1 bg-white rounded-lg p-4 shadow">
                 <Text className="text-sm text-gray-600">Total Profit</Text>
-                <Text className="text-2xl font-bold text-purple-600">${stats.totalProfit.toFixed(2)}</Text>
+                <Text className="text-2xl font-bold text-purple-600">৳{stats.totalProfit.toFixed(2)}</Text>
               </View>
               <View className="flex-1 bg-white rounded-lg p-4 shadow">
                 <Text className="text-sm text-gray-600">Avg Order</Text>
-                <Text className="text-2xl font-bold text-orange-600">${stats.averageOrderValue.toFixed(2)}</Text>
+                <Text className="text-2xl font-bold text-orange-600">৳{stats.averageOrderValue.toFixed(2)}</Text>
               </View>
             </View>
           </View>

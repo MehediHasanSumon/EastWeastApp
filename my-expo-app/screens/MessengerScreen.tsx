@@ -1,348 +1,444 @@
-import React, { useEffect, useState, useRef } from 'react';
-import {
-  View,
-  StyleSheet,
-  Dimensions,
-  StatusBar,
-} from 'react-native';
-import { useAppDispatch, useAppSelector } from '../store';
-import { 
-  fetchConversations, 
-  setCurrentConversation,
-  addMessage,
-  addMessageReaction,
-  addSelectedUser,
-  clearError,
-  clearSelectedUsers,
-  createConversation,
-  deleteMessage,
-  fetchMessages,
-  removeSelectedUser,
-  setTypingUser,
-  updateMessage,
-} from '../store/chatSlice';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useContext, useState, useEffect } from 'react';
+import { FlatList, Text, TextInput, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import { ThemeContext } from '../context/ThemeContext';
-import { useContext } from 'react';
-import { IConversation, IMessage } from '../types/chat';
-import { chatSocketService } from '../utils/chatSocket';
-import ConversationList from '../components/Chat/ConversationList';
-import ChatInterface from '../components/Chat/ChatInterface';
-import { useChat } from '../context/ChatContext';
+import { RootStackParamList } from '../types/types';
+import api from '../utils/api';
+import chatSocketService from '../utils/socketService';
 
-const { width, height } = Dimensions.get('window');
+type Props = NativeStackScreenProps<RootStackParamList, 'Messenger'>;
 
-const MessengerScreen: React.FC = () => {
-  const dispatch = useAppDispatch();
+type Conversation = {
+  _id: string;
+  name?: string;
+  lastMessage?: {
+    content: string;
+    createdAt: string;
+  };
+  lastMessageTime?: string;
+  unreadCount?: { [userId: string]: number };
+  participants: Array<{
+    _id: string;
+    name: string;
+    email: string;
+    avatar?: string;
+    presence?: {
+      isOnline: boolean;
+    };
+  }>;
+  type: 'direct' | 'group';
+};
+
+type Message = {
+  _id?: string;
+  id?: string;
+  content?: string;
+  text?: string;
+  createdAt?: string;
+  time?: string;
+  isOwn?: boolean;
+  sender?: {
+    _id: string;
+    name: string;
+  };
+};
+
+const MessengerScreen = ({ navigation }: Props) => {
   const { theme } = useContext(ThemeContext);
-  const { user } = useAppSelector((state) => state.auth);
-  const { 
-    conversations, 
-    currentConversation, 
-    messages, 
-    loading, 
-    error, 
-    typingUsers, 
-    selectedUsers, 
-    searchResults, 
-    pagination 
-  } = useAppSelector((state) => state.chat);
-  
-  const { isConnected, joinConversation, leaveConversation } = useChat();
-  
-  const [showNewConversationModal, setShowNewConversationModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'conversations' | 'chat'>('conversations');
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [messageText, setMessageText] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const socketInitialized = useRef(false);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string>('');
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isTyping, setIsTyping] = useState(false);
 
-  const unreadTotal = React.useMemo(() => {
-    const uid = user?.id || (user as any)?._id;
-    if (!uid) return 0;
-    return conversations.reduce((sum, c) => sum + (c.unreadCount?.[uid] || 0), 0);
-  }, [conversations, user]);
-
-  // Live refs to avoid stale closures in socket listeners
-  const conversationsRef = useRef(conversations);
-  const currentConversationRef = useRef(currentConversation);
-  const currentUserIdRef = useRef<string | undefined>(user?.id || (user as any)?._id);
-
-  useEffect(() => { conversationsRef.current = conversations; }, [conversations]);
-  useEffect(() => { currentConversationRef.current = currentConversation; }, [currentConversation]);
-  useEffect(() => { currentUserIdRef.current = user?.id || (user as any)?._id; }, [user]);
-
-  // Initialize socket connection
   useEffect(() => {
-    if (!socketInitialized.current && user && isConnected) {
-      socketInitialized.current = true;
-
-      // Set up socket event listeners
-      chatSocketService.on('new_message', (message: any) => {
-        dispatch(addMessage(message));
-
-        // Ensure typing indicator clears when a message arrives from a user
-        try {
-          if (message?.conversationId && message?.sender?._id) {
-            dispatch(
-              setTypingUser({
-                conversationId: message.conversationId,
-                userId: message.sender._id,
-                isTyping: false,
-              })
-            );
-          }
-        } catch {}
-
-        const convList = conversationsRef.current || [];
-        const activeConv = currentConversationRef.current;
-        const uid = currentUserIdRef.current;
-
-        // Safety
-        if (!uid) return;
-
-        const conversation = convList.find((c) => c._id === message.conversationId);
-        const isMuted = !!conversation?.mutedBy?.[uid];
-        const isOwn = message?.sender?._id === uid;
-        const isActive = activeConv?._id === message.conversationId;
-
-        // If active, immediately mark as read to keep unread count accurate
-        if (isActive) {
-          try { 
-            chatSocketService.markConversationAsRead(message.conversationId); 
-          } catch {}
-        }
-      });
-
-      chatSocketService.on('typing_start', (data: any) => {
-        dispatch(setTypingUser({
-          conversationId: data.conversationId,
-          userId: data.userId,
-          userName: data.userName,
-          isTyping: true,
-        }));
-      });
-
-      chatSocketService.on('typing_stop', (data: any) => {
-        dispatch(setTypingUser({
-          conversationId: data.conversationId,
-          userId: data.userId,
-          userName: '',
-          isTyping: false,
-        }));
-      });
-
-      chatSocketService.on('conversation_updated', (data: any) => {
-        // Handle conversation updates
-        console.log('Conversation updated:', data);
-      });
-
-      chatSocketService.on('error', (error: any) => {
-        console.error('Socket error:', error);
-      });
-    }
-  }, [user, isConnected, dispatch]);
-
-  // Load conversations on mount
-  useEffect(() => {
-    if (user) {
-      loadConversations();
-    }
-  }, [user]);
-
-  // Load messages when conversation changes
-  useEffect(() => {
-    if (currentConversation) {
-      loadMessages();
-      joinConversation(currentConversation._id);
-    } else {
-      // Leave previous conversation if any
-      if (conversations.length > 0) {
-        leaveConversation(conversations[0]._id);
-      }
-    }
-
-    return () => {
-      if (currentConversation) {
-        leaveConversation(currentConversation._id);
-      }
-    };
-  }, [currentConversation]);
-
-  const loadConversations = async () => {
-    try {
-      console.log('🔍 Loading conversations...');
-      console.log('🔍 User:', user);
-      console.log('🔍 User ID:', user?.id || user?._id);
-      
-      const result = await dispatch(fetchConversations()).unwrap();
-      console.log('✅ Conversations loaded successfully:', result);
-      console.log('✅ Number of conversations:', result.length);
-      
-      if (result.length === 0) {
-        console.log('⚠️ No conversations found - this might be normal for new users');
-      }
-    } catch (error: any) {
-      console.error('❌ Failed to load conversations:', error);
-      console.error('❌ Error details:', {
-        message: error.message,
-        stack: error.stack,
-        type: error.constructor.name
-      });
-    }
-  };
-
-  const loadMessages = async () => {
-    if (!currentConversation) return;
+    fetchConversations();
+    getCurrentUser();
+    initializeSocket();
     
-    try {
-      await dispatch(fetchMessages({ 
-        conversationId: currentConversation._id,
-        page: 1,
-        limit: 20
-      })).unwrap();
-    } catch (error: any) {
-      console.error('Failed to load messages:', error);
-    }
-  };
-
-  const handleConversationSelect = (conversation: IConversation) => {
-    dispatch(setCurrentConversation(conversation));
-  };
-
-  const handleNewConversation = () => {
-    setShowNewConversationModal(true);
-  };
-
-  const handleSendMessage = async (content: string, messageType = 'text', mediaUrl?: string, durationSeconds?: number, replyToId?: string) => {
-    if (!currentConversation) return;
-
-    const messageData = {
-      conversationId: currentConversation._id,
-      content,
-      messageType,
-      mediaUrl,
-      duration: durationSeconds,
-      replyTo: replyToId,
+    return () => {
+      chatSocketService.disconnect();
     };
+  }, []);
 
+  const initializeSocket = async () => {
+    await chatSocketService.connect();
+    
+    chatSocketService.on('new_message', (message: any) => {
+      if (selectedConversation && message.conversationId === selectedConversation._id) {
+        setMessages(prev => [...prev, message]);
+      }
+      fetchConversations(); // Refresh conversation list
+    });
+
+    chatSocketService.on('typing_start', (data: any) => {
+      if (selectedConversation && data.conversationId === selectedConversation._id && data.userId !== currentUserId) {
+        setIsTyping(true);
+      }
+    });
+
+    chatSocketService.on('typing_stop', (data: any) => {
+      if (selectedConversation && data.conversationId === selectedConversation._id) {
+        setIsTyping(false);
+      }
+    });
+
+    chatSocketService.on('message_error', (error: any) => {
+      console.error('Message error:', error);
+    });
+  };
+
+  const getCurrentUser = async () => {
     try {
-      // Send via socket
-      chatSocketService.sendMessage(messageData);
-      
-      // Optimistically add message to state
-      const optimisticMessage: IMessage = {
-        _id: Date.now().toString(),
-        content,
-        messageType,
-        sender: { _id: user?.id || user?._id || 'currentUser', name: user?.name || 'You', email: user?.email || '' } as any,
-        conversationId: currentConversation._id,
-        timestamp: new Date(),
-        readBy: [],
-        replyTo: replyToId ? messages.find(m => m._id === replyToId) : undefined,
-        mediaUrl,
-        duration: durationSeconds,
-      };
-
-      dispatch(addMessage(optimisticMessage));
+      const response = await api.get('/api/me');
+      if (response.data.status) {
+        setCurrentUserId(response.data.user._id || response.data.user.id);
+      }
     } catch (error) {
-      console.error('Failed to send message:', error);
+      console.error('Failed to get current user:', error);
     }
   };
 
-  const handleTyping = (isTyping: boolean) => {
-    if (!currentConversation) return;
+  const fetchConversations = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/api/chat/conversations');
+      if (response.data.success) {
+        setConversations(response.data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch conversations:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    if (isTyping) {
-      chatSocketService.startTyping(currentConversation._id);
+  const getConversationName = (conversation: Conversation) => {
+    if (conversation.type === 'group') {
+      return conversation.name || 'Group Chat';
+    }
+    const otherParticipant = conversation.participants.find(p => p._id !== currentUserId);
+    return otherParticipant?.name || 'Unknown User';
+  };
+
+  const getConversationAvatar = (conversation: Conversation) => {
+    if (conversation.type === 'group') {
+      return '👥';
+    }
+    return '👤';
+  };
+
+  const isOtherUserOnline = (conversation: Conversation) => {
+    if (conversation.type !== 'direct') return false;
+    const otherParticipant = conversation.participants.find(p => p._id !== currentUserId);
+    return otherParticipant?.presence?.isOnline || false;
+  };
+
+  const formatTime = (dateString?: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+
+    if (diffInHours < 24) {
+      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    } else if (diffInHours < 48) {
+      return 'Yesterday';
     } else {
-      chatSocketService.stopTyping(currentConversation._id);
+      return date.toLocaleDateString();
     }
   };
 
-  const handleMessageReaction = (messageId: string, reactionType: string, emoji: string) => {
-    // TODO: Implement message reaction
-    console.log('Message reaction:', { messageId, reactionType, emoji });
+  const getUnreadCount = (conversation: Conversation) => {
+    return conversation.unreadCount?.[currentUserId] || 0;
   };
 
-  const handleMessageEdit = (messageId: string, content: string) => {
-    // TODO: Implement message edit
-    console.log('Message edit:', { messageId, content });
-  };
-
-  const handleMessageDelete = (messageId: string) => {
-    dispatch(deleteMessage(messageId));
-  };
-
-  const handleMarkAsRead = (messageId: string) => {
-    // TODO: Implement mark as read
-    console.log('Mark as read:', messageId);
-  };
-
-  const handleLoadOlder = async () => {
-    if (!currentConversation || !pagination.hasMore) return;
-
+  const fetchMessages = async (conversationId: string) => {
     try {
-      await dispatch(fetchMessages({ 
-        conversationId: currentConversation._id,
-        page: pagination.page + 1,
-        limit: pagination.limit
-      })).unwrap();
+      const response = await api.get(`/api/chat/conversations/${conversationId}/messages`);
+      if (response.data.success) {
+        setMessages(response.data.data);
+      }
     } catch (error) {
-      console.error('Failed to load older messages:', error);
+      console.error('Failed to fetch messages:', error);
     }
   };
 
-  const handleToggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
+  const sendMessage = () => {
+    if (!messageText.trim() || !selectedConversation) return;
+    
+    chatSocketService.sendMessage({
+      conversationId: selectedConversation._id,
+      content: messageText.trim(),
+      messageType: 'text'
+    });
+    
+    setMessageText('');
+    chatSocketService.stopTyping(selectedConversation._id);
   };
 
-  if (!user) {
+  const handleTyping = (text: string) => {
+    setMessageText(text);
+    
+    if (!selectedConversation) return;
+    
+    if (text.length > 0) {
+      chatSocketService.startTyping(selectedConversation._id);
+    } else {
+      chatSocketService.stopTyping(selectedConversation._id);
+    }
+  };
+
+
+
+  const renderConversation = ({ item }: { item: Conversation }) => {
+    const unreadCount = getUnreadCount(item);
+    const isOnline = isOtherUserOnline(item);
+    const conversationName = getConversationName(item);
+    const avatar = getConversationAvatar(item);
+    const lastMessageText = item.lastMessage?.content || 'No messages yet';
+    const time = formatTime(item.lastMessageTime || item.lastMessage?.createdAt);
+
     return (
-      <View style={[styles.container, { backgroundColor: theme.bgColor }]}>
-        <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
-        {/* TODO: Show login prompt */}
+      <TouchableOpacity
+        className="flex-row items-center p-4 border-b"
+        style={{
+          backgroundColor: theme.mode === 'dark' ? '#2a2a2a' : '#ffffff',
+          borderBottomColor: theme.mode === 'dark' ? '#404040' : '#e5e5e5',
+        }}
+        onPress={() => {
+          setSelectedConversation(item);
+          setActiveTab('chat');
+          fetchMessages(item._id);
+        }}>
+        <View className="relative mr-3">
+          <View
+            className="w-12 h-12 rounded-full items-center justify-center"
+            style={{
+              backgroundColor: theme.mode === 'dark' ? '#404040' : '#f0f0f0',
+            }}>
+            <Text className="text-xl">{avatar}</Text>
+          </View>
+          {isOnline && (
+            <View className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white" />
+          )}
+        </View>
+        <View className="flex-1">
+          <View className="flex-row justify-between items-center mb-1">
+            <Text
+              className="font-semibold"
+              style={{ color: theme.fontColor, fontSize: theme.fontSize }}>
+              {conversationName}
+            </Text>
+            <Text
+              className="text-xs"
+              style={{ color: theme.mode === 'dark' ? '#888' : '#666' }}>
+              {time}
+            </Text>
+          </View>
+          <View className="flex-row justify-between items-center">
+            <Text
+              className="flex-1"
+              style={{
+                color: theme.mode === 'dark' ? '#aaa' : '#666',
+                fontSize: theme.fontSize - 2,
+              }}
+              numberOfLines={1}>
+              {lastMessageText}
+            </Text>
+            {unreadCount > 0 && (
+              <View className="ml-2 w-5 h-5 bg-blue-500 rounded-full items-center justify-center">
+                <Text className="text-white text-xs font-bold">{unreadCount}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderMessage = ({ item }: { item: Message }) => {
+    const isOwn = item.sender?._id === currentUserId || item.isOwn;
+    const messageTime = item.createdAt ? formatTime(item.createdAt) : item.time;
+    
+    return (
+      <View
+        className={`mb-3 ${isOwn ? 'items-end' : 'items-start'}`}
+        style={{ paddingHorizontal: 16 }}>
+        <View
+          className={`max-w-[80%] p-3 rounded-2xl`}
+          style={{
+            backgroundColor: isOwn
+              ? '#3b82f6'
+              : theme.mode === 'dark'
+              ? '#2a2a2a'
+              : '#f0f0f0',
+          }}>
+          <Text
+            style={{
+              color: isOwn ? '#ffffff' : theme.fontColor,
+              fontSize: theme.fontSize,
+            }}>
+            {item.content || item.text}
+          </Text>
+          <Text
+            className="text-xs mt-1"
+            style={{
+              color: isOwn
+                ? 'rgba(255,255,255,0.7)'
+                : theme.mode === 'dark'
+                ? '#888'
+                : '#666',
+            }}>
+            {messageTime}
+          </Text>
+        </View>
       </View>
     );
-  }
+  };
 
-  return (
-    <View style={[styles.container, { backgroundColor: theme.bgColor }]}>
-      <StatusBar barStyle={theme.mode === 'dark' ? 'light-content' : 'dark-content'} />
-      
-      {currentConversation ? (
-        <ChatInterface
-          conversation={currentConversation}
-          messages={messages}
-          typingUsers={typingUsers}
-          onSendMessage={handleSendMessage}
-          onTyping={handleTyping}
-          onMessageReaction={handleMessageReaction}
-          onMessageEdit={handleMessageEdit}
-          onMessageDelete={handleMessageDelete}
-          onMarkAsRead={handleMarkAsRead}
-          currentUser={user}
-          onToggleSidebar={handleToggleSidebar}
-          onLoadOlder={handleLoadOlder}
-          hasMoreOlder={pagination.hasMore}
-          isLoadingOlder={loading}
+  const filteredConversations = conversations.filter(conv => {
+    if (!searchQuery) return true;
+    const name = getConversationName(conv).toLowerCase();
+    const lastMessage = conv.lastMessage?.content?.toLowerCase() || '';
+    return name.includes(searchQuery.toLowerCase()) || lastMessage.includes(searchQuery.toLowerCase());
+  });
+
+  const ConversationsList = () => (
+    <View className="flex-1" style={{ backgroundColor: theme.bgColor }}>
+      <View
+        className="p-4 border-b"
+        style={{
+          backgroundColor: theme.mode === 'dark' ? '#1a1a1a' : '#f8f9fa',
+          borderBottomColor: theme.mode === 'dark' ? '#404040' : '#e5e5e5',
+        }}>
+        <Text
+          className="text-xl font-bold mb-3"
+          style={{ color: theme.fontColor }}>
+          Messages
+        </Text>
+        <TextInput
+          className="p-3 rounded-lg border"
+          style={{
+            backgroundColor: theme.mode === 'dark' ? '#2a2a2a' : '#ffffff',
+            borderColor: theme.mode === 'dark' ? '#404040' : '#e5e5e5',
+            color: theme.fontColor,
+          }}
+          placeholder="Search conversations..."
+          placeholderTextColor={theme.mode === 'dark' ? '#888' : '#666'}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
         />
+      </View>
+      {loading ? (
+        <View className="flex-1 items-center justify-center">
+          <ActivityIndicator size="large" color="#3b82f6" />
+          <Text
+            className="mt-2"
+            style={{ color: theme.fontColor }}>
+            Loading conversations...
+          </Text>
+        </View>
       ) : (
-        <ConversationList
-          conversations={conversations}
-          currentConversationId={currentConversation?._id}
-          onConversationSelect={handleConversationSelect}
-          onNewConversation={handleNewConversation}
-          isLoading={loading}
-          onRefresh={loadConversations}
+        <FlatList
+          data={filteredConversations}
+          renderItem={renderConversation}
+          keyExtractor={(item) => item._id}
+          style={{ backgroundColor: theme.bgColor }}
           refreshing={loading}
+          onRefresh={fetchConversations}
         />
       )}
     </View>
   );
-};
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
+  const ChatInterface = () => (
+    <View className="flex-1" style={{ backgroundColor: theme.bgColor }}>
+      <View
+        className="flex-row items-center p-4 border-b"
+        style={{
+          backgroundColor: theme.mode === 'dark' ? '#1a1a1a' : '#f8f9fa',
+          borderBottomColor: theme.mode === 'dark' ? '#404040' : '#e5e5e5',
+        }}>
+        <TouchableOpacity
+          className="mr-3 p-2"
+          onPress={() => setActiveTab('conversations')}>
+          <Text style={{ color: theme.fontColor, fontSize: 18 }}>←</Text>
+        </TouchableOpacity>
+        <View className="flex-row items-center flex-1">
+          <View
+            className="w-10 h-10 rounded-full items-center justify-center mr-3"
+            style={{
+              backgroundColor: theme.mode === 'dark' ? '#404040' : '#f0f0f0',
+            }}>
+            <Text>{selectedConversation ? getConversationAvatar(selectedConversation) : '👤'}</Text>
+          </View>
+          <View>
+            <Text
+              className="font-semibold"
+              style={{ color: theme.fontColor, fontSize: theme.fontSize }}>
+              {selectedConversation ? getConversationName(selectedConversation) : 'Unknown'}
+            </Text>
+            <Text
+              className="text-xs"
+              style={{ color: theme.mode === 'dark' ? '#888' : '#666' }}>
+              {selectedConversation ? (isOtherUserOnline(selectedConversation) ? 'Online' : 'Offline') : 'Offline'}
+            </Text>
+          </View>
+        </View>
+      </View>
+      
+      <FlatList
+        data={messages}
+        renderItem={renderMessage}
+        keyExtractor={(item) => item._id || item.id}
+        className="flex-1 pt-4"
+        style={{ backgroundColor: theme.bgColor }}
+      />
+      
+      {isTyping && (
+        <View className="px-4 py-2">
+          <Text
+            className="text-sm italic"
+            style={{ color: theme.mode === 'dark' ? '#888' : '#666' }}>
+            Someone is typing...
+          </Text>
+        </View>
+      )}
+      
+      <View
+        className="flex-row items-center p-4 border-t"
+        style={{
+          backgroundColor: theme.mode === 'dark' ? '#1a1a1a' : '#f8f9fa',
+          borderTopColor: theme.mode === 'dark' ? '#404040' : '#e5e5e5',
+        }}>
+        <TextInput
+          className="flex-1 p-3 mr-3 rounded-full border"
+          style={{
+            backgroundColor: theme.mode === 'dark' ? '#2a2a2a' : '#ffffff',
+            borderColor: theme.mode === 'dark' ? '#404040' : '#e5e5e5',
+            color: theme.fontColor,
+          }}
+          placeholder="Type a message..."
+          placeholderTextColor={theme.mode === 'dark' ? '#888' : '#666'}
+          value={messageText}
+          onChangeText={handleTyping}
+          multiline
+        />
+        <TouchableOpacity
+          className="w-12 h-12 bg-blue-500 rounded-full items-center justify-center"
+          onPress={sendMessage}>
+          <Text className="text-white font-bold">→</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
+  return activeTab === 'conversations' ? <ConversationsList /> : <ChatInterface />;
+};
 
 export default MessengerScreen;
