@@ -2,7 +2,6 @@ import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 import { FaRegUserCircle } from "react-icons/fa";
 import { HiOutlineMail } from "react-icons/hi";
-import { IoMoonOutline } from "react-icons/io5";
 import { MdLockOutline } from "react-icons/md";
 import { NavLink } from "react-router";
 
@@ -28,12 +27,7 @@ const SettingsSidebar: React.FC = () => {
       label: "Password",
       path: "/password-settings",
       icon: <MdLockOutline className="w-5 h-5 mr-3" />,
-    },
-    {
-      label: "Appearance",
-      path: "/theme-settings",
-      icon: <IoMoonOutline className="w-5 h-5 mr-3" />,
-    },
+    }
   ];
 
   return (
@@ -54,10 +48,9 @@ const SettingsSidebar: React.FC = () => {
               key={item.path}
               to={item.path}
               className={({ isActive }: any) =>
-                `flex items-center px-4 py-3 rounded-xl transition-all ${
-                  isActive
-                    ? "bg-indigo-600 text-white shadow-md"
-                    : "text-indigo-700 hover:bg-indigo-200 dark:text-gray-300 dark:hover:bg-gray-700"
+                `flex items-center px-4 py-3 rounded-xl transition-all ${isActive
+                  ? "bg-indigo-600 text-white shadow-md"
+                  : "text-indigo-700 hover:bg-indigo-200 dark:text-gray-300 dark:hover:bg-gray-700"
                 }`
               }
             >

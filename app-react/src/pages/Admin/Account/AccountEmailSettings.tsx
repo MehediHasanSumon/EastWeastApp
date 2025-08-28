@@ -2,6 +2,8 @@ import { motion } from "framer-motion";
 import { HiOutlineMail } from "react-icons/hi";
 import AdminLayout from "../../../layouts/Admin/AdminLayout";
 import AdminSettingLayout from "../../../layouts/Admin/AdminSettingLayout";
+import Input from "../../../components/ui/Input";
+import Label from "../../../components/ui/Label";
 
 const AccountEmailSettings = () => {
   const breadcrumbItems = [{ label: "Dashboard", path: "/dashboard" }, { label: "Settings" }];
@@ -17,29 +19,29 @@ const AccountEmailSettings = () => {
           <div className="bg-white dark:bg-gray-700 rounded-xl shadow-sm p-6">
             <form className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Current Email</label>
-                <input
+                <Label htmlFor="currentEmail">Current Email</Label>
+                <Input
+                  id="currentEmail"
                   type="email"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:text-white"
                   placeholder="john@example.com"
                   disabled
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">New Email</label>
-                <input
+                <Label htmlFor="newEmail">New Email</Label>
+                <Input
+                  id="newEmail"
                   type="email"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:text-white"
                   placeholder="new-email@example.com"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Confirm New Email</label>
-                <input
+                <Label htmlFor="confirmEmail">Confirm New Email</Label>
+                <Input
+                  id="confirmEmail"
                   type="email"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:text-white"
                   placeholder="new-email@example.com"
                 />
               </div>

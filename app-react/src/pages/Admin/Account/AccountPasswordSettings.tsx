@@ -2,6 +2,8 @@ import { motion } from "framer-motion";
 import { MdLockOutline } from "react-icons/md";
 import AdminLayout from "../../../layouts/Admin/AdminLayout";
 import AdminSettingLayout from "../../../layouts/Admin/AdminSettingLayout";
+import Input from "../../../components/ui/Input";
+import Label from "../../../components/ui/Label";
 
 const AccountPasswordSettings = () => {
   const breadcrumbItems = [{ label: "Dashboard", path: "/dashboard" }, { label: "Settings" }];
@@ -17,29 +19,29 @@ const AccountPasswordSettings = () => {
           <div className="bg-white dark:bg-gray-700 rounded-xl shadow-sm p-6">
             <form className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Current Password</label>
-                <input
+                <Label htmlFor="currentPassword">Current Password</Label>
+                <Input
+                  id="currentPassword"
                   type="password"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:text-white"
                   placeholder="••••••••"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">New Password</label>
-                <input
+                <Label htmlFor="newPassword">New Password</Label>
+                <Input
+                  id="newPassword"
                   type="password"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:text-white"
                   placeholder="••••••••"
                 />
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Password must be at least 8 characters long</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Confirm New Password</label>
-                <input
+                <Label htmlFor="confirmPassword">Confirm New Password</Label>
+                <Input
+                  id="confirmPassword"
                   type="password"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-800 dark:text-white"
                   placeholder="••••••••"
                 />
               </div>
