@@ -194,9 +194,26 @@ class ChatSocketService {
   }
 
   // React to a message
-  reactToMessage(messageId: string, reaction: { type: string; emoji: string }) {
+  reactToMessage(messageId: string, reaction: { type: string; emoji: string } | string) {
     if (this.socket && this.isConnected) {
-      this.socket.emit('message_reaction', { messageId, reaction });
+      let reactionType: string;
+      let emoji: string;
+      
+      if (typeof reaction === 'string') {
+        // Backward compatibility: if reaction is just a string, treat it as emoji
+        reactionType = 'like';
+        emoji = reaction;
+      } else {
+        // New format: reaction is an object with type and emoji
+        reactionType = reaction.type;
+        emoji = reaction.emoji;
+      }
+      
+      this.socket.emit('react_to_message', { 
+        messageId, 
+        reactionType, 
+        emoji 
+      });
     }
   }
 

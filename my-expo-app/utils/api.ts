@@ -192,6 +192,69 @@ export async function uploadAvatar(formData: FormData): Promise<{ status: boolea
   }
 }
 
+// User Status Management APIs
+export async function updateUserStatus(payload: {
+  status: 'online' | 'away' | 'busy' | 'offline';
+  lastSeen: string;
+  deviceId: string;
+}): Promise<{ status: boolean; message: string }> {
+  try {
+    const res = await api.post('/api/user/status', payload);
+    return res.data;
+  } catch (error: any) {
+    console.error('Update user status API error:', error);
+    throw error;
+  }
+}
+
+export async function sendHeartbeat(payload: {
+  deviceId: string;
+}): Promise<{ status: boolean; message: string }> {
+  try {
+    const res = await api.post('/api/user/heartbeat', payload);
+    return res.data;
+  } catch (error: any) {
+    console.error('Heartbeat API error:', error);
+    throw error;
+  }
+}
+
+export async function getUserStatus(userId: string): Promise<{
+  status: boolean;
+  userStatus: {
+    status: 'online' | 'away' | 'busy' | 'offline';
+    lastSeen: string;
+    isOnline: boolean;
+  };
+}> {
+  try {
+    const res = await api.get(`/api/user/${userId}/status`);
+    return res.data;
+  } catch (error: any) {
+    console.error('Get user status API error:', error);
+    throw error;
+  }
+}
+
+export async function getOnlineUsers(): Promise<{
+  status: boolean;
+  users: Array<{
+    _id: string;
+    name: string;
+    email: string;
+    status: 'online' | 'away' | 'busy' | 'offline';
+    lastSeen: string;
+  }>;
+}> {
+  try {
+    const res = await api.get('/api/users/online');
+    return res.data;
+  } catch (error: any) {
+    console.error('Get online users API error:', error);
+    throw error;
+  }
+}
+
 export async function persistFromLogin(data: LoginResponse): Promise<void> {
   try {
     const { token, user } = data;

@@ -364,8 +364,8 @@ export default function ReportScreen() {
       <ScrollView className="flex-1 px-4">
         {/* Stats Cards */}
         {stats && (
-          <View className="mt-4 space-y-3">
-            <View className="flex-row space-x-3">
+          <View className="mt-4 gap-3">
+            <View className="flex-row gap-3">
               <View className="flex-1 bg-white rounded-lg p-4 shadow">
                 <Text className="text-sm text-gray-600">Total Invoices</Text>
                 <Text className="text-2xl font-bold text-blue-600">{stats.totalInvoices}</Text>
@@ -376,7 +376,7 @@ export default function ReportScreen() {
               </View>
             </View>
             
-            <View className="flex-row space-x-3">
+            <View className="flex-row gap-3">
               <View className="flex-1 bg-white rounded-lg p-4 shadow">
                 <Text className="text-sm text-gray-600">Total Profit</Text>
                 <Text className="text-2xl font-bold text-purple-600">${stats.totalProfit.toFixed(2)}</Text>
@@ -405,7 +405,7 @@ export default function ReportScreen() {
         </View>
 
         {/* Search and Actions */}
-        <View className="mt-4 flex-row space-x-2">
+        <View className="mt-4 flex-row gap-3">
           <TextInput
             value={search}
             onChangeText={setSearch}
@@ -517,7 +517,7 @@ export default function ReportScreen() {
                 />
               </View>
               
-              <View className="flex-row space-x-2">
+              <View className="flex-row gap-3">
                 <View className="flex-1">
                   <Text className="text-sm font-medium text-gray-700 mb-1">Min Amount</Text>
                   <TextInput
@@ -542,7 +542,7 @@ export default function ReportScreen() {
             </View>
           </ScrollView>
           
-          <View className="flex-row space-x-2 mt-4">
+          <View className="flex-row gap-3 mt-4">
             <TouchableOpacity
               onPress={clearFilters}
               className="flex-1 bg-gray-500 rounded-lg py-3">
@@ -606,7 +606,7 @@ export default function ReportScreen() {
               <Text className="text-sm text-gray-600">• Date range: {filters.startDate || 'All'} to {filters.endDate || 'All'}</Text>
             </View>
             
-            <View className="flex-row space-x-2">
+            <View className="flex-row gap-3">
               <TouchableOpacity
                 onPress={() => setExportModalVisible(false)}
                 className="flex-1 bg-gray-500 rounded-lg py-3">

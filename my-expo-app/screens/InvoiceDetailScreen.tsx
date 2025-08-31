@@ -52,7 +52,7 @@ const InvoiceDetailScreen = () => {
   };
 
   const handlePrint = () => {
-    navigation.navigate('PrintMakeInvoice', {
+    (navigation as any).navigate('PrintMakeInvoice', {
       invoiceNo: invoice.invoice_no,
       dateTime: invoice.date_time,
       vehicleNo: invoice.vehicle_no || '',
@@ -76,11 +76,6 @@ const InvoiceDetailScreen = () => {
         className="pt-12 pb-6 px-4"
         style={{ overflow: 'hidden' }}>
         <View className="flex-row items-center justify-between">
-          <Pressable
-            onPress={() => navigation.goBack()}
-            className="p-2 rounded-full bg-white/20">
-            <Ionicons name="arrow-back" size={24} color="white" />
-          </Pressable>
           <Text className="text-2xl font-bold text-white text-center flex-1">
             Invoice Details
           </Text>
@@ -239,7 +234,7 @@ const InvoiceDetailScreen = () => {
         </View>
 
         {/* Action Buttons */}
-        <View className="mt-6 mb-8 space-y-3">
+        <View className="mt-6 mb-8 gap-3">
           <Pressable
             onPress={handlePrint}
             className="bg-blue-600 py-4 px-6 rounded-lg flex-row items-center justify-center">

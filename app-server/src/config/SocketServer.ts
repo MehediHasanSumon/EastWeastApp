@@ -193,12 +193,23 @@ export class SocketServer {
         emoji: string;
       }) => {
         try {
-          const messageDoc = await this.addMessageReaction(
-            data.messageId,
-            socket.userId!,
-            data.reactionType,
-            data.emoji
-          );
+          let messageDoc;
+          
+          if (data.reactionType === 'remove') {
+            // Remove reaction
+            messageDoc = await this.removeMessageReaction(
+              data.messageId,
+              socket.userId!
+            );
+          } else {
+            // Add reaction
+            messageDoc = await this.addMessageReaction(
+              data.messageId,
+              socket.userId!,
+              data.reactionType,
+              data.emoji
+            );
+          }
           
           const convId = (messageDoc as any)?.conversationId?.toString?.();
           if (convId) {
@@ -210,7 +221,7 @@ export class SocketServer {
             });
           }
         } catch (error) {
-          socket.emit("reaction_error", { error: "Failed to add reaction" });
+          socket.emit("reaction_error", { error: "Failed to handle reaction" });
         }
       });
 
@@ -412,6 +423,33 @@ export class SocketServer {
     });
   }
 
+  private async updateConversationLastMessageAfterDelete(conversationId: string, deletedMessageId: string) {
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) return;
+
+    // If the deleted message was the last message, find the previous non-deleted message
+    if (conversation.lastMessage?.toString() === deletedMessageId) {
+      const previousMessage = await Message.findOne({
+        conversationId,
+        _id: { $ne: deletedMessageId },
+        isDeleted: false
+      }).sort({ createdAt: -1 });
+
+      if (previousMessage) {
+        // Update conversation with the previous message
+        await Conversation.findByIdAndUpdate(conversationId, {
+          lastMessage: previousMessage._id,
+          lastMessageTime: previousMessage.createdAt,
+        });
+      } else {
+        // No more messages in conversation, clear lastMessage
+        await Conversation.findByIdAndUpdate(conversationId, {
+          $unset: { lastMessage: "", lastMessageTime: "" },
+        });
+      }
+    }
+  }
+
   private async markMessageAsDelivered(messageId: string, conversationId: string) {
     const conversation = await Conversation.findById(conversationId);
     if (!conversation) return;
@@ -433,6 +471,18 @@ export class SocketServer {
     await Message.updateOne(
       { _id: messageId },
       { $set: { [`reactions.${userId}`]: { type: reactionType, emoji } } }
+    );
+    return await Message.findById(messageId);
+  }
+
+  private async removeMessageReaction(messageId: string, userId: string) {
+    const message = await Message.findById(messageId);
+    if (!message) throw new Error("Message not found");
+
+    // Remove the user's reaction
+    await Message.updateOne(
+      { _id: messageId },
+      { $unset: { [`reactions.${userId}`]: "" } }
     );
     return await Message.findById(messageId);
   }
@@ -475,7 +525,12 @@ export class SocketServer {
 
     message.isDeleted = true;
     message.deletedAt = new Date();
-    return await message.save();
+    await message.save();
+
+    // Update conversation's last message if this was the last message
+    await this.updateConversationLastMessageAfterDelete(message.conversationId, messageId);
+    
+    return message;
   }
 
   public getIO() {

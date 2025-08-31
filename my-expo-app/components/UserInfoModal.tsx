@@ -12,6 +12,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { ThemeContext } from '../context/ThemeContext';
 import { useContext } from 'react';
+import Avatar from './Avatar';
 
 const { width, height } = Dimensions.get('window');
 
@@ -30,6 +31,7 @@ interface Conversation {
   type: 'direct' | 'group';
   participants: User[];
   createdAt: string;
+  avatar?: string;
 }
 
 interface UserInfoModalProps {
@@ -95,15 +97,14 @@ const UserInfoModal: React.FC<UserInfoModalProps> = ({
         <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
           {/* Profile Section */}
           <View style={styles.profileSection}>
-            <Image
-              source={
-                conversation.type === 'direct' && otherUser?.avatar
-                  ? { uri: otherUser.avatar }
-                  : conversation.type === 'group'
-                  ? require('../assets/group-icon.png')
-                  : require('../assets/default-avatar.png')
-              }
-              style={styles.profileAvatar}
+            <Avatar
+              user={conversation.type === 'direct' ? (otherUser || { name: 'Unknown User' }) : {
+                name: conversation.name || 'Group Chat',
+                avatar: conversation.type === 'group' ? conversation.avatar : undefined
+              }}
+              isGroup={conversation.type === 'group'}
+              size={80}
+              showOnlineIndicator={false}
             />
             
             <Text style={[styles.profileName, { color: theme.fontColor }]}>
@@ -182,13 +183,10 @@ const UserInfoModal: React.FC<UserInfoModalProps> = ({
                 
                 {conversation.participants.map((participant) => (
                   <View key={participant._id} style={styles.memberRow}>
-                    <Image
-                      source={
-                        participant.avatar
-                          ? { uri: participant.avatar }
-                          : require('../assets/default-avatar.png')
-                      }
-                      style={styles.memberAvatar}
+                    <Avatar
+                      user={participant}
+                      size={40}
+                      showOnlineIndicator={false}
                     />
                     <View style={styles.memberInfo}>
                       <Text style={[styles.memberName, { color: theme.fontColor }]}>
@@ -269,12 +267,7 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
     paddingHorizontal: 16,
   },
-  profileAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    marginBottom: 16,
-  },
+
   profileName: {
     fontSize: 24,
     fontWeight: '600',
@@ -315,12 +308,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
-  memberAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    marginRight: 12,
-  },
+
   memberInfo: {
     flex: 1,
   },

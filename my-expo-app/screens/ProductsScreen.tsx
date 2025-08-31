@@ -260,18 +260,7 @@ export default function ProductsScreen() {
               {item.status ? 'Active' : 'Inactive'}
             </Text>
           </View>
-          <View className="flex-row space-x-2">
-            <TouchableOpacity
-              onPress={() => handleStatusToggle(item)}
-              className={`p-2 rounded-full ${
-                item.status ? 'bg-yellow-100' : 'bg-green-100'
-              }`}>
-              <Ionicons
-                name={item.status ? 'pause' : 'play'}
-                size={16}
-                color={item.status ? '#d97706' : '#059669'}
-              />
-            </TouchableOpacity>
+          <View className="flex-row gap-3">
             <TouchableOpacity
               onPress={() => openViewModal(item)}
               className="p-2 rounded-full bg-blue-100">
@@ -336,7 +325,7 @@ export default function ProductsScreen() {
 
       {/* Search and Add Button */}
       <View className="px-4 mt-4">
-        <View className="flex-row space-x-3">
+        <View className="flex-row gap-3">
           <View className="flex-1">
             <TextInput
               className="bg-white rounded-lg px-4 py-3 border border-gray-300"
@@ -402,7 +391,7 @@ export default function ProductsScreen() {
               </TouchableOpacity>
             </View>
             
-            <View className="space-y-4">
+            <View className="gap-3">
               <View>
                 <Text className="text-sm font-semibold text-gray-700 mb-2">Product Name *</Text>
                 <TextInput
@@ -448,7 +437,7 @@ export default function ProductsScreen() {
               </View>
             </View>
             
-            <View className="flex-row space-x-3 mt-8">
+            <View className="flex-row gap-3 mt-8">
               <TouchableOpacity
                 onPress={() => setCreateModalVisible(false)}
                 className="flex-1 bg-gray-500 py-3 rounded-lg">
@@ -484,7 +473,7 @@ export default function ProductsScreen() {
               </TouchableOpacity>
             </View>
             
-            <View className="space-y-4">
+            <View className="gap-3">
               <View>
                 <Text className="text-sm font-semibold text-gray-700 mb-2">Product Name *</Text>
                 <TextInput
@@ -530,7 +519,7 @@ export default function ProductsScreen() {
               </View>
             </View>
             
-            <View className="flex-row space-x-3 mt-8">
+            <View className="flex-row gap-3 mt-8">
               <TouchableOpacity
                 onPress={() => setEditModalVisible(false)}
                 className="flex-1 bg-gray-500 py-3 rounded-lg">
@@ -567,7 +556,7 @@ export default function ProductsScreen() {
             </View>
             
             {products.length > 0 && (
-              <View className="space-y-4">
+              <View className="gap-3">
                 <View>
                   <Text className="text-sm font-semibold text-gray-700 mb-2">Product Name</Text>
                   <Text className="text-lg text-gray-800">{formData.name}</Text>
@@ -599,7 +588,7 @@ export default function ProductsScreen() {
               </View>
             )}
             
-            <View className="flex-row space-x-3 mt-8">
+            <View className="flex-row gap-3 mt-8">
               <TouchableOpacity
                 onPress={() => setViewModalVisible(false)}
                 className="flex-1 bg-gray-500 py-3 rounded-lg">

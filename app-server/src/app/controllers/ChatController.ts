@@ -187,8 +187,7 @@ export class ChatController {
       const skip = (Number(page) - 1) * Number(limit);
 
       const messages = await Message.find({
-        conversationId,
-        isDeleted: false
+        conversationId
       })
         .populate("sender", "name email avatar")
         .populate("replyTo", "content sender")
@@ -197,8 +196,7 @@ export class ChatController {
         .limit(Number(limit));
 
       const totalMessages = await Message.countDocuments({
-        conversationId,
-        isDeleted: false
+        conversationId
       });
 
       res.json({

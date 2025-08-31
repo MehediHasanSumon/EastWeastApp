@@ -17,8 +17,9 @@ const { width } = Dimensions.get('window');
 
 interface MessageReactionsProps {
   message: ChatMessage;
-  onReactionPress: (emoji: string) => void;
+  onReactionPress: (emoji: string, messageId: string) => void;
   onReactionLongPress: (emoji: string) => void;
+  currentUserId?: string;
 }
 
 interface ReactionGroup {
@@ -31,6 +32,7 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
   message,
   onReactionPress,
   onReactionLongPress,
+  currentUserId,
 }) => {
   const { theme } = useContext(ThemeContext);
   const [showReactionDetails, setShowReactionDetails] = useState(false);
@@ -52,10 +54,16 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
     return acc;
   }, [] as ReactionGroup[]);
 
+  // Check if current user has reacted to each emoji
+  const hasUserReacted = (emoji: string) => {
+    if (!currentUserId) return false;
+    return message.reactions[currentUserId]?.emoji === emoji;
+  };
+
   if (reactionGroups.length === 0) return null;
 
   const handleReactionPress = (emoji: string) => {
-    onReactionPress(emoji);
+    onReactionPress(emoji, message._id);
   };
 
   const handleReactionLongPress = (reaction: ReactionGroup) => {
@@ -88,14 +96,25 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
             key={`${reaction.emoji}-${index}`}
             style={[
               styles.reactionItem,
-              { backgroundColor: theme.mode === 'dark' ? '#3A3B3C' : '#F0F2F5' }
+              { 
+                backgroundColor: hasUserReacted(reaction.emoji)
+                  ? (theme.mode === 'dark' ? '#4CAF50' : '#4CAF50')
+                  : (theme.mode === 'dark' ? '#3A3B3C' : '#F0F2F5'),
+                borderColor: hasUserReacted(reaction.emoji) ? '#4CAF50' : 'transparent',
+                borderWidth: hasUserReacted(reaction.emoji) ? 2 : 0,
+              }
             ]}
             onPress={() => handleReactionPress(reaction.emoji)}
             onLongPress={() => handleReactionLongPress(reaction)}
             delayLongPress={500}
           >
             <Text style={styles.reactionEmoji}>{reaction.emoji}</Text>
-            <Text style={[styles.reactionCount, { color: theme.fontColor }]}>
+            <Text style={[
+              styles.reactionCount, 
+              { 
+                color: hasUserReacted(reaction.emoji) ? '#FFFFFF' : theme.fontColor 
+              }
+            ]}>
               {reaction.count}
             </Text>
           </TouchableOpacity>
@@ -162,7 +181,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: 8,
+    marginBottom: 4,
     gap: 4,
+    justifyContent: 'flex-start',
+    alignSelf: 'flex-start',
   },
   reactionItem: {
     flexDirection: 'row',

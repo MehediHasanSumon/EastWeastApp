@@ -17,6 +17,7 @@ import { fetchConversations, setCurrentConversation } from '../store/chatSlice';
 import { chatSocketService } from '../utils/chatSocket';
 import { ChatConversation, ChatUser } from '../types/chat';
 import { ThemeContext } from '../context/ThemeContext';
+import Avatar from '../components/Avatar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -70,12 +71,18 @@ const ConversationListScreen: React.FC = () => {
     return otherUser?.name || 'Unknown User';
   };
 
-  const getConversationAvatar = (conversation: ChatConversation): string => {
+  const getConversationAvatar = (conversation: ChatConversation) => {
     if (conversation.type === 'group') {
-      return conversation.avatar || '';
+      return { 
+        isGroup: true,
+        user: {
+          name: conversation.name || 'Group Chat',
+          avatar: conversation.avatar
+        }
+      };
     }
     const otherUser = getOtherParticipant(conversation);
-    return otherUser?.avatar || '';
+    return { user: otherUser || { name: 'Unknown User' }, isGroup: false };
   };
 
   const getLastMessageText = (conversation: ChatConversation): string => {
@@ -125,15 +132,12 @@ const ConversationListScreen: React.FC = () => {
         onPress={() => handleConversationPress(item)}
       >
         <View style={styles.avatarContainer}>
-          <Image
-            source={
-              getConversationAvatar(item)
-                ? { uri: getConversationAvatar(item) }
-                : require('../assets/default-avatar.png')
-            }
-            style={styles.avatar}
+          <Avatar
+            {...getConversationAvatar(item)}
+            size={50}
+            showOnlineIndicator={true}
+            isOnline={isOnline}
           />
-          {isOnline && <View style={[styles.onlineIndicator, { borderColor: theme.bgColor }]} />}
         </View>
 
         <View style={styles.contentContainer}>
@@ -266,8 +270,7 @@ const styles = StyleSheet.create({
   list: { flex: 1 },
   conversationItem: { flexDirection: 'row', paddingHorizontal: 20, paddingVertical: 15, borderBottomWidth: 1, borderBottomColor: '#F3F4F620' },
   avatarContainer: { position: 'relative', marginRight: 15 },
-  avatar: { width: 60, height: 60, borderRadius: 30 },
-  onlineIndicator: { position: 'absolute', bottom: 2, right: 2, width: 14, height: 14, borderRadius: 7, backgroundColor: '#10B981', borderWidth: 2 },
+
   contentContainer: { flex: 1, justifyContent: 'center' },
   headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
   name: { fontSize: 17, fontWeight: '700', flex: 1 },

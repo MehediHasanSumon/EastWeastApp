@@ -331,14 +331,6 @@ export default function MakeInvoiceScreen({ navigation }: Props) {
   return (
     <ScrollView className="flex-1 bg-gray-100" contentContainerClassName="p-5 pt-8">
       <View className="rounded-2xl bg-white p-8 shadow-lg shadow-black/10">
-        <LinearGradient
-          colors={['#667eea', '#764ba2']}
-          className="mb-5 rounded-xl"
-          style={{ overflow: 'hidden' }}>
-          <Text className="py-2 text-center text-3xl font-extrabold text-white">
-            ✨ Cash Memo ✨
-          </Text>
-        </LinearGradient>
 
         {/* Invoice No */}
         <View className="mb-5">

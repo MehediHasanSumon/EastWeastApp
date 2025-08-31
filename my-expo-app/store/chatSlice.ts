@@ -3,6 +3,23 @@ import { ChatState, ChatConversation, ChatMessage, TypingUser, SocketMessage } f
 import { chatApiService } from '../utils/chatApi';
 import { chatSocketService } from '../utils/chatSocket';
 
+// Helper function to ensure message dates are serializable
+const normalizeMessageDates = (message: any) => {
+  if (message.editedAt instanceof Date) {
+    message.editedAt = message.editedAt.toISOString();
+  }
+  if (message.deletedAt instanceof Date) {
+    message.deletedAt = message.deletedAt.toISOString();
+  }
+  if (message.createdAt instanceof Date) {
+    message.createdAt = message.createdAt.toISOString();
+  }
+  if (message.updatedAt instanceof Date) {
+    message.updatedAt = message.updatedAt.toISOString();
+  }
+  return message;
+};
+
 const initialState: ChatState = {
   conversations: [],
   currentConversation: null,
@@ -76,7 +93,7 @@ const chatSlice = createSlice({
     },
     
     addMessage: (state, action: PayloadAction<ChatMessage>) => {
-      const message = action.payload;
+      const message = normalizeMessageDates(action.payload);
       const conversationId = message.conversationId;
       
       if (!state.messages[conversationId]) {
@@ -115,6 +132,24 @@ const chatSlice = createSlice({
       const messages = state.messages[conversationId];
       if (messages) {
         state.messages[conversationId] = messages.filter(m => m._id !== messageId);
+      }
+    },
+    
+    deleteMessage: (state, action: PayloadAction<{ messageId: string; conversationId: string; deleteForEveryone: boolean }>) => {
+      const { messageId, conversationId, deleteForEveryone } = action.payload;
+      const messages = state.messages[conversationId];
+      if (messages) {
+        if (deleteForEveryone) {
+          // Hard delete - remove message completely
+          state.messages[conversationId] = messages.filter(m => m._id !== messageId);
+        } else {
+          // Soft delete - mark message as deleted
+          const messageIndex = messages.findIndex(m => m._id === messageId);
+          if (messageIndex !== -1) {
+            messages[messageIndex].isDeleted = true;
+            messages[messageIndex].deletedAt = new Date().toISOString();
+          }
+        }
       }
     },
     
@@ -179,6 +214,42 @@ const chatSlice = createSlice({
     clearMessages: (state, action: PayloadAction<string>) => {
       state.messages[action.payload] = [];
     },
+    
+    addMessageReaction: (state, action: PayloadAction<{
+      messageId: string;
+      userId: string;
+      reactionType: string;
+      emoji: string;
+      conversationId: string;
+    }>) => {
+      const { messageId, userId, reactionType, emoji, conversationId } = action.payload;
+      
+      if (state.messages[conversationId]) {
+        const messageIndex = state.messages[conversationId].findIndex(m => m._id === messageId);
+        if (messageIndex !== -1) {
+          state.messages[conversationId][messageIndex].reactions[userId] = {
+            type: reactionType,
+            emoji,
+            timestamp: new Date().toISOString(),
+          };
+        }
+      }
+    },
+    
+    removeMessageReaction: (state, action: PayloadAction<{
+      messageId: string;
+      userId: string;
+      conversationId: string;
+    }>) => {
+      const { messageId, userId, conversationId } = action.payload;
+      
+      if (state.messages[conversationId]) {
+        const messageIndex = state.messages[conversationId].findIndex(m => m._id === messageId);
+        if (messageIndex !== -1) {
+          delete state.messages[conversationId][messageIndex].reactions[userId];
+        }
+      }
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -209,12 +280,15 @@ const chatSlice = createSlice({
           state.messages[conversationId] = [];
         }
         
+        // Normalize dates in messages to ensure they're serializable
+        const normalizedMessages = messages.map(normalizeMessageDates);
+        
         // If it's the first page, replace messages, otherwise append
         if (pagination.currentPage === 1) {
-          state.messages[conversationId] = messages;
+          state.messages[conversationId] = normalizedMessages;
         } else {
           // Prepend older messages
-          state.messages[conversationId] = [...messages, ...state.messages[conversationId]];
+          state.messages[conversationId] = [...normalizedMessages, ...state.messages[conversationId]];
         }
       })
       .addCase(fetchMessages.rejected, (state, action) => {
@@ -242,6 +316,7 @@ export const {
   addMessage,
   updateMessage,
   removeMessage,
+  deleteMessage,
   setTypingUser,
   setOnlineUsers,
   addOnlineUser,
@@ -251,6 +326,8 @@ export const {
   removeConversation,
   clearError,
   clearMessages,
+  addMessageReaction,
+  removeMessageReaction,
 } = chatSlice.actions;
 
 export default chatSlice.reducer;

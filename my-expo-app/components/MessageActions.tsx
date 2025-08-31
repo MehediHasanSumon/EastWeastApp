@@ -26,6 +26,7 @@ interface MessageActionsProps {
   onDelete: (deleteForEveryone: boolean) => void;
   onReply: () => void;
   onForward: () => void;
+  onShowReactionPicker?: () => void;
 }
 
 const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '😡', '👏', '🙏', '🔥', '💯'];
@@ -40,11 +41,18 @@ const MessageActions: React.FC<MessageActionsProps> = ({
   onDelete,
   onReply,
   onForward,
+  onShowReactionPicker,
 }) => {
-  const { theme } = useContext(ThemeContext);
+  const themeContext = useContext(ThemeContext);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editContent, setEditContent] = useState(message.content);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
+
+  // Safety check for theme context
+  if (!themeContext) {
+    return null;
+  }
+
+  const { theme } = themeContext;
 
   const handleEdit = () => {
     setShowEditModal(true);
@@ -58,26 +66,7 @@ const MessageActions: React.FC<MessageActionsProps> = ({
     }
   };
 
-  const handleDelete = (deleteForEveryone: boolean) => {
-    Alert.alert(
-      deleteForEveryone ? 'Delete for Everyone' : 'Delete for Me',
-      deleteForEveryone 
-        ? 'This message will be deleted for everyone. This action cannot be undone.'
-        : 'This message will be deleted for you only.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: () => {
-            onDelete(deleteForEveryone);
-            setShowDeleteModal(false);
-            onClose();
-          },
-        },
-      ]
-    );
-  };
+
 
   const handleReaction = (emoji: string) => {
     onReact(emoji);
@@ -109,12 +98,25 @@ const MessageActions: React.FC<MessageActionsProps> = ({
                   </TouchableOpacity>
                 ))}
               </View>
+
+              {onShowReactionPicker && (
+                <TouchableOpacity
+                  style={[
+                    styles.moreReactionsButton,
+                    { backgroundColor: theme.mode === 'dark' ? '#3A3B3C' : '#F0F2F5' }
+                  ]}
+                  onPress={onShowReactionPicker}
+                >
+                  <Ionicons name="add-circle-outline" size={20} color={theme.fontColor} />
+                  <Text style={[styles.actionText, { color: theme.fontColor }]}>More Reactions</Text>
+                </TouchableOpacity>
+              )}
             </View>
 
             {/* Message Actions */}
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, { color: theme.fontColor + '99' }]}>Actions</Text>
-              
+
               <TouchableOpacity style={styles.actionButton} onPress={onReply}>
                 <Ionicons name="arrow-undo" size={20} color={theme.fontColor} />
                 <Text style={[styles.actionText, { color: theme.fontColor }]}>Reply</Text>
@@ -125,17 +127,17 @@ const MessageActions: React.FC<MessageActionsProps> = ({
                 <Text style={[styles.actionText, { color: theme.fontColor }]}>Forward</Text>
               </TouchableOpacity>
 
-              {isOwnMessage && message.canEdit && (
+              {isOwnMessage && (
                 <TouchableOpacity style={styles.actionButton} onPress={handleEdit}>
                   <Ionicons name="create-outline" size={20} color={theme.fontColor} />
                   <Text style={[styles.actionText, { color: theme.fontColor }]}>Edit</Text>
                 </TouchableOpacity>
               )}
 
-              {isOwnMessage && message.canDelete && (
-                <TouchableOpacity 
-                  style={[styles.actionButton, styles.deleteButton]} 
-                  onPress={() => setShowDeleteModal(true)}
+              {isOwnMessage && (
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.deleteButton]}
+                  onPress={() => onDelete(false)}
                 >
                   <Ionicons name="trash-outline" size={20} color="#FF3B30" />
                   <Text style={[styles.actionText, { color: '#FF3B30' }]}>Delete</Text>
@@ -143,8 +145,8 @@ const MessageActions: React.FC<MessageActionsProps> = ({
               )}
 
               {!isOwnMessage && (
-                <TouchableOpacity 
-                  style={[styles.actionButton, styles.deleteButton]} 
+                <TouchableOpacity
+                  style={[styles.actionButton, styles.deleteButton]}
                   onPress={() => onDelete(false)}
                 >
                   <Ionicons name="remove-circle-outline" size={20} color="#FF3B30" />
@@ -166,9 +168,9 @@ const MessageActions: React.FC<MessageActionsProps> = ({
         <View style={styles.editOverlay}>
           <View style={[styles.editContainer, { backgroundColor: theme.mode === 'dark' ? '#242526' : '#FFFFFF' }]}>
             <Text style={[styles.editTitle, { color: theme.fontColor }]}>Edit Message</Text>
-            
+
             <TextInput
-              style={[styles.editInput, { 
+              style={[styles.editInput, {
                 color: theme.fontColor,
                 backgroundColor: theme.mode === 'dark' ? '#3A3B3C' : '#F0F2F5',
                 borderColor: theme.mode === 'dark' ? '#3A3B3C' : '#E4E6EB'
@@ -179,17 +181,17 @@ const MessageActions: React.FC<MessageActionsProps> = ({
               placeholder="Edit your message..."
               placeholderTextColor={theme.fontColor + '66'}
             />
-            
+
             <View style={styles.editActions}>
-              <TouchableOpacity 
-                style={[styles.editButton, styles.cancelButton]} 
+              <TouchableOpacity
+                style={[styles.editButton, styles.cancelButton]}
                 onPress={() => setShowEditModal(false)}
               >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.editButton, styles.saveButton]} 
+
+              <TouchableOpacity
+                style={[styles.editButton, styles.saveButton]}
                 onPress={handleEditSubmit}
                 disabled={!editContent.trim() || editContent === message.content}
               >
@@ -200,48 +202,9 @@ const MessageActions: React.FC<MessageActionsProps> = ({
         </View>
       </Modal>
 
-      {/* Delete Confirmation Modal */}
-      <Modal
-        visible={showDeleteModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowDeleteModal(false)}
-      >
-        <View style={styles.editOverlay}>
-          <View style={[styles.editContainer, { backgroundColor: theme.mode === 'dark' ? '#242526' : '#FFFFFF' }]}>
-            <Text style={[styles.editTitle, { color: theme.fontColor }]}>Delete Message</Text>
-            
-            <Text style={[styles.deleteDescription, { color: theme.fontColor + '99' }]}>
-              Choose how you want to delete this message:
-            </Text>
-            
-            <View style={styles.deleteActions}>
-              <TouchableOpacity 
-                style={[styles.deleteOptionButton, { borderColor: theme.fontColor + '30' }]} 
-                onPress={() => handleDelete(false)}
-              >
-                <Ionicons name="person-outline" size={20} color={theme.fontColor} />
-                <Text style={[styles.deleteOptionText, { color: theme.fontColor }]}>Delete for Me</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.deleteOptionButton, { borderColor: theme.fontColor + '30' }]} 
-                onPress={() => handleDelete(true)}
-              >
-                <Ionicons name="people-outline" size={20} color={theme.fontColor} />
-                <Text style={[styles.deleteOptionText, { color: theme.fontColor }]}>Delete for Everyone</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <TouchableOpacity 
-              style={[styles.editButton, styles.cancelButton]} 
-              onPress={() => setShowDeleteModal(false)}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+
+
+
     </>
   );
 };
@@ -306,6 +269,15 @@ const styles = StyleSheet.create({
   },
   deleteButton: {
     backgroundColor: '#FF3B3010',
+  },
+  moreReactionsButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginTop: 8,
   },
   editOverlay: {
     flex: 1,

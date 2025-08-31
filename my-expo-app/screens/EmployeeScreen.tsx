@@ -248,21 +248,7 @@ export default function EmployeeScreen() {
     );
   };
 
-  const handleStatusToggle = async (userId: string, currentStatus: boolean) => {
-    try {
-      const response = await api.put(`/api/admin/update/status/user/${userId}`, {
-        status: !currentStatus,
-      });
-      if (response.data.status) {
-        fetchUsers();
-      } else {
-        throw new Error(response.data.message || 'Failed to update status');
-      }
-    } catch (error: any) {
-      console.error('Error updating status:', error);
-      Alert.alert('Error', 'Failed to update user status');
-    }
-  };
+
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -303,18 +289,7 @@ export default function EmployeeScreen() {
               {item.status ? 'Active' : 'Inactive'}
             </Text>
           </View>
-          <View className="flex-row space-x-2">
-            <TouchableOpacity
-              onPress={() => handleStatusToggle(item._id, item.status)}
-              className={`p-2 rounded-full ${
-                item.status ? 'bg-yellow-100' : 'bg-green-100'
-              }`}>
-              <Ionicons
-                name={item.status ? 'pause' : 'play'}
-                size={16}
-                color={item.status ? '#d97706' : '#059669'}
-              />
-            </TouchableOpacity>
+          <View className="flex-row gap-2">
             <TouchableOpacity
               onPress={() => openEditModal(item)}
               className="p-2 rounded-full bg-blue-100">
@@ -357,8 +332,8 @@ export default function EmployeeScreen() {
       </LinearGradient>
 
       {/* Search and Filters */}
-      <View className="px-4 mt-4 space-y-3">
-        <View className="flex-row space-x-3">
+      <View className="px-4 mt-4 gap-3">
+        <View className="flex-row gap-3">
           <View className="flex-1">
             <TextInput
               className="bg-white rounded-lg px-4 py-3 border border-gray-300"
@@ -444,7 +419,7 @@ export default function EmployeeScreen() {
             </View>
 
             {/* Form Fields */}
-            <View className="space-y-4">
+            <View className="gap-4">
               <View>
                 <Text className="text-sm font-semibold text-gray-700 mb-2">Name *</Text>
                 <TextInput

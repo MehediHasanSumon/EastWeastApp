@@ -12,6 +12,8 @@ import { AuthProvider } from './context/AuthContext';
 import ThemeProvider from './context/ThemeContext';
 import { ChatProvider } from './context/ChatContext';
 import { ToastProvider } from './context/ToastContext';
+import { UserStatusProvider } from './context/UserStatusContext';
+import UserStatusErrorBoundary from './components/UserStatusErrorBoundary';
 
 // Store
 import { store } from './store';
@@ -39,7 +41,7 @@ import NewConversationScreen from './screens/NewConversationScreen';
 // Types
 import CreateProduct from 'components/CreateProduct';
 import ProductScreen from './screens/ProductsScreen';
-import ReportsScreen from './screens/ReportScreen';
+import ReportScreen from './screens/ReportScreen';
 import { RootStackParamList } from './types/types';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -105,7 +107,7 @@ const AppNavigator = () => {
             component={DipCalculationScreen}
             options={{ title: 'Dip Calculation' }}
           />
-          <Stack.Screen name="Report" component={ReportsScreen} />
+          <Stack.Screen name="Report" component={ReportScreen} />
           <Stack.Screen name="Products" component={ProductScreen} />
           <Stack.Screen
             name="CreateProduct"
@@ -155,13 +157,17 @@ export default function App() {
     <Provider store={store}>
       <ThemeProvider>
         <AuthProvider>
-          <ChatProvider>
-            <ToastProvider>
-              <NavigationContainer>
-                <AppNavigator />
-              </NavigationContainer>
-            </ToastProvider>
-          </ChatProvider>
+          <UserStatusErrorBoundary>
+            <UserStatusProvider>
+              <ChatProvider>
+                <ToastProvider>
+                  <NavigationContainer>
+                    <AppNavigator />
+                  </NavigationContainer>
+                </ToastProvider>
+              </ChatProvider>
+            </UserStatusProvider>
+          </UserStatusErrorBoundary>
         </AuthProvider>
       </ThemeProvider>
     </Provider>

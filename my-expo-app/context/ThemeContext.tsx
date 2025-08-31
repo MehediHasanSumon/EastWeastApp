@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createContext, ReactNode, useCallback, useEffect, useState } from 'react';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 
 type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -8,6 +8,7 @@ interface Theme {
   bgColor: string;
   fontColor: string;
   fontSize: number;
+  primaryGradient?: readonly [string, string];
 }
 
 interface ThemeContextType {
@@ -21,9 +22,25 @@ export const ThemeContext = createContext<ThemeContextType>({
     bgColor: '#ffffff',
     fontColor: '#000000',
     fontSize: 16,
+    primaryGradient: ['#6366F1', '#8B5CF6'] as const,
   },
   updateTheme: () => {},
 });
+
+// Custom hook to use the theme context
+export const useTheme = () => {
+  const context = useContext(ThemeContext);
+  if (!context) {
+    throw new Error('useTheme must be used within a ThemeProvider');
+  }
+  return context;
+};
+
+// Hook to check if theme is ready
+export const useThemeReady = () => {
+  const context = useContext(ThemeContext);
+  return !!context;
+};
 
 export default function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setTheme] = useState<Theme>({
@@ -31,6 +48,7 @@ export default function ThemeProvider({ children }: { children: ReactNode }) {
     bgColor: '#ffffff',
     fontColor: '#000000',
     fontSize: 16,
+    primaryGradient: ['#6366F1', '#8B5CF6'] as const,
   });
   const [loading, setLoading] = useState(true);
 
@@ -69,7 +87,20 @@ export default function ThemeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   if (loading) {
-    return null; // Or you can return a splash/loading screen
+    return (
+      <ThemeContext.Provider value={{ 
+        theme: {
+          mode: 'light',
+          bgColor: '#ffffff',
+          fontColor: '#000000',
+          fontSize: 16,
+          primaryGradient: ['#6366F1', '#8B5CF6'] as const,
+        }, 
+        updateTheme: () => {} 
+      }}>
+        {children}
+      </ThemeContext.Provider>
+    );
   }
 
   return <ThemeContext.Provider value={{ theme, updateTheme }}>{children}</ThemeContext.Provider>;

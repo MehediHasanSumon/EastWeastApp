@@ -13,6 +13,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import UserStatusManager from '../components/UserStatusManager';
+import OfflineIndicator from '../components/OfflineIndicator';
+import SimpleUserStatus from '../components/SimpleUserStatus';
+import Avatar from '../components/Avatar';
 
 interface User {
   id: string;
@@ -148,28 +152,33 @@ const ProfileScreen = ({ navigation }: { navigation: any }) => {
         {user && (
           <View className="mx-4 my-4 rounded-lg bg-white p-5 shadow-md">
             <View className="items-center border-b border-gray-300 pb-5">
-              <View className="relative mb-4 h-[100px] w-[100px] items-center justify-center rounded-full bg-[#1877f2]">
-                {user.profileImage ? (
-                  <Image
-                    source={{ uri: user.profileImage }}
-                    className="h-[100px] w-[100px] rounded-full"
-                  />
-                ) : (
-                  <Text className="text-[40px] font-bold text-white">{user.avatarText}</Text>
-                )}
+              <View className="relative mb-4 items-center justify-center">
+                <Avatar
+                  user={{
+                    name: user.name,
+                    avatar: user.profileImage
+                  }}
+                  size={100}
+                  showOnlineIndicator={true}
+                  isOnline={user.isOnline}
+                />
 
                 <TouchableOpacity
                   className="absolute bottom-0 right-0 h-9 w-9 items-center justify-center rounded-full border-2 border-white bg-blue-600"
                   onPress={handleEditProfile}>
                   <MaterialIcons name="photo-camera" size={20} color="white" />
                 </TouchableOpacity>
-
-                {user.isOnline && (
-                  <View className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-[#31A24C]" />
-                )}
               </View>
 
               <Text className="mb-1 text-[22px] font-extrabold text-[#050505]">{user.name}</Text>
+              
+              {/* User Status Manager */}
+              <View className="mb-4 items-center">
+                <UserStatusManager />
+                <SimpleUserStatus />
+                <OfflineIndicator />
+              </View>
+              
               <Text className="mb-4 text-[14px] text-gray-500">
                 {user.isOnline ? 'Active now' : `Last active ${user.lastActive}`}
               </Text>

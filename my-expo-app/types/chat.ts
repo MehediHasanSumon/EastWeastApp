@@ -7,7 +7,7 @@ export interface ChatUser {
   verified?: boolean;
   presence?: {
     status: 'online' | 'offline' | 'away';
-    lastSeen?: Date;
+    lastSeen?: string;
   };
 }
 
@@ -38,11 +38,9 @@ export interface ChatMessage {
     };
   };
   isEdited: boolean;
-  editedAt?: Date;
+  editedAt?: string;
   isDeleted: boolean;
-  deletedAt?: Date;
-  canEdit: boolean;
-  canDelete: boolean;
+  deletedAt?: string;
   readBy: string[];
   deliveredTo: string[];
   createdAt: string;
