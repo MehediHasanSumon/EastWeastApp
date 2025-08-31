@@ -10,6 +10,9 @@ export interface IMessage extends Document {
   fileSize?: number;
   duration?: number; // for voice/video messages
   replyTo?: mongoose.Types.ObjectId;
+  isForwarded?: boolean;
+  originalMessageId?: mongoose.Types.ObjectId;
+  originalSenderId?: mongoose.Types.ObjectId;
   reactions: {
     [userId: string]: {
       type: string;
@@ -62,6 +65,18 @@ const messageSchema = new Schema<IMessage>(
     replyTo: {
       type: Schema.Types.ObjectId,
       ref: "Message",
+    },
+    isForwarded: {
+      type: Boolean,
+      default: false,
+    },
+    originalMessageId: {
+      type: Schema.Types.ObjectId,
+      ref: "Message",
+    },
+    originalSenderId: {
+      type: Schema.Types.ObjectId,
+      ref: "User",
     },
     reactions: {
       type: Map,

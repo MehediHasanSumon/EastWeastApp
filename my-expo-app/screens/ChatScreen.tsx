@@ -32,6 +32,7 @@ import UserInfoModal from '../components/UserInfoModal';
 import notificationService from '../utils/notificationService';
 import MessageActions from '../components/MessageActions';
 import ReactionPicker from '../components/ReactionPicker';
+import ForwardModal from '../components/ForwardModal';
 import { useToast } from '../context/ToastContext';
 import ToastContainer from '../components/ToastContainer';
 import {
@@ -47,7 +48,7 @@ const ChatScreen: React.FC = () => {
   const dispatch = useAppDispatch();
   const themeContext = useContext(ThemeContext);
   const { user } = useAppSelector((state) => state.auth);
-  const { currentConversation, messages, typingUsers, isLoading } = useAppSelector((state) => state.chat);
+  const { currentConversation, messages, typingUsers, isLoading, conversations } = useAppSelector((state) => state.chat);
   const { showToast } = useToast();
   
   // Safety check for theme context
@@ -70,6 +71,8 @@ const ChatScreen: React.FC = () => {
   const [showReactionPicker, setShowReactionPicker] = useState(false);
   const [reactionMessageId, setReactionMessageId] = useState<string | null>(null);
   const [replyToMessage, setReplyToMessage] = useState<ChatMessage | null>(null);
+  const [forwardMessage, setForwardMessage] = useState<ChatMessage | null>(null);
+  const [showForwardModal, setShowForwardModal] = useState(false);
   const flatListRef = useRef<FlatList>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const appState = useRef(AppState.currentState);
@@ -469,14 +472,49 @@ Animated.sequence([
 
   const handleMessageForward = () => {
     if (selectedMessage) {
-      // TODO: Implement forward logic
       console.log('Forward message:', selectedMessage._id);
+      setForwardMessage(selectedMessage);
+      setShowForwardModal(true);
       setShowMessageActions(false);
+      setSelectedMessage(null);
     }
   };
 
   const cancelReply = () => {
     setReplyToMessage(null);
+  };
+
+  const handleForwardToConversation = async (targetConversationId: string) => {
+    if (!forwardMessage || !currentConversation) return;
+
+    try {
+      // Use WebSocket to forward the message
+      const forwardedMessage = await chatSocketService.forwardMessage(
+        forwardMessage._id,
+        targetConversationId
+      );
+      
+      // Close forward modal and clear state
+      setShowForwardModal(false);
+      setForwardMessage(null);
+      
+      // Show success message
+      showToast('Message forwarded successfully', 'success');
+      
+      // Navigate to the target conversation if it's different
+      if (targetConversationId !== currentConversation._id) {
+        // You can implement navigation to the target conversation here
+        console.log('Forwarded to conversation:', targetConversationId);
+      }
+    } catch (error: any) {
+      console.error('❌ Error forwarding message:', error);
+      showToast('Failed to forward message', 'error');
+    }
+  };
+
+  const cancelForward = () => {
+    setShowForwardModal(false);
+    setForwardMessage(null);
   };
 
   const handleReactionPress = (emoji: string, messageId?: string) => {
@@ -665,6 +703,16 @@ Animated.sequence([
         messageId={reactionMessageId || ''}
         currentReactions={reactionMessageId ? messages[currentConversation?._id || '']?.find(m => m._id === reactionMessageId)?.reactions : {}}
         currentUserId={user?._id}
+      />
+
+      {/* Forward Modal */}
+      <ForwardModal
+        visible={showForwardModal}
+        message={forwardMessage}
+        conversations={Object.values(conversations || {}).filter(conv => conv._id !== currentConversation?._id)}
+        onForward={handleForwardToConversation}
+        onCancel={cancelForward}
+        isLoading={isLoading}
       />
       
       {/* Toast Container for notifications */}

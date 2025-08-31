@@ -231,6 +231,27 @@ class ChatSocketService {
     }
   }
 
+  // Forward a message to another conversation
+  forwardMessage(messageId: string, targetConversationId: string): Promise<ChatMessage> {
+    return new Promise((resolve, reject) => {
+      if (!this.socket || !this.isConnected) {
+        reject(new Error('Socket not connected'));
+        return;
+      }
+
+      this.socket.emit('forward_message', {
+        messageId,
+        targetConversationId,
+      }, (response: any) => {
+        if (response.success) {
+          resolve(response.message);
+        } else {
+          reject(new Error(response.error || 'Failed to forward message'));
+        }
+      });
+    });
+  }
+
   // Event listener management
   on(event: string, callback: Function) {
     if (!this.listeners.has(event)) {

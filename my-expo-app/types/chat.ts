@@ -29,6 +29,9 @@ export interface ChatMessage {
     url?: string;
   }>;
   replyTo?: ChatMessage;
+  isForwarded?: boolean;
+  originalMessageId?: string;
+  originalSenderId?: string;
   status?: 'sent' | 'delivered' | 'read';
   reactions: {
     [userId: string]: {

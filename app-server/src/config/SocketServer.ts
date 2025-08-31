@@ -121,6 +121,9 @@ export class SocketServer {
         fileSize?: number;
         duration?: number; // voice/video length in seconds
         replyTo?: string;
+        isForwarded?: boolean;
+        originalMessageId?: string;
+        originalSenderId?: string;
       }, ack?: (res: any) => void) => {
         try {
           // Authorization: must be participant
@@ -266,6 +269,82 @@ export class SocketServer {
           });
         } catch (error) {
           socket.emit("delete_error", { error: "Failed to delete message" });
+        }
+      });
+
+      // Handle message forwarding
+      socket.on("forward_message", async (data: {
+        messageId: string;
+        targetConversationId: string;
+      }, ack?: (res: any) => void) => {
+        try {
+          // Check if user is participant in both source and target conversations
+          const sourceMessage = await Message.findById(data.messageId).populate("sender", "name email avatar");
+          if (!sourceMessage) {
+            if (ack) ack({ success: false, error: "Message not found" });
+            return;
+          }
+
+          const isSourceMember = await this.isParticipant(String(sourceMessage.conversationId), socket.userId!);
+          const isTargetMember = await this.isParticipant(data.targetConversationId, socket.userId!);
+          
+          if (!isSourceMember || !isTargetMember) {
+            if (ack) ack({ success: false, error: "Access denied" });
+            return;
+          }
+
+          // Create forward message data
+          const forwardData = {
+            conversationId: data.targetConversationId,
+            content: sourceMessage.content,
+            messageType: sourceMessage.messageType,
+            mediaUrl: sourceMessage.mediaUrl,
+            fileName: sourceMessage.fileName,
+            fileSize: sourceMessage.fileSize,
+            duration: sourceMessage.duration,
+            isForwarded: true,
+            originalMessageId: sourceMessage._id,
+            originalSenderId: sourceMessage.sender._id,
+            replyTo: undefined, // Clear any existing reply
+          };
+
+          // Create and send the forwarded message
+          const forwardedMessage = await this.createMessage(socket.userId!, forwardData);
+          const populatedForwardedMessage = await Message.findById(String(forwardedMessage._id))
+            .populate("sender", "name email avatar")
+            .populate({
+              path: "replyTo",
+              select: "content sender messageType mediaUrl fileName",
+              populate: { path: "sender", select: "name email avatar" }
+            });
+
+          // Emit to target conversation participants
+          this.io.to(data.targetConversationId).emit("new_message", populatedForwardedMessage);
+
+          // Update conversation last message
+          await this.updateConversationLastMessage(data.targetConversationId, String(forwardedMessage._id));
+
+          // If conversation was soft-deleted by any participant, make it visible again
+          try {
+            await Conversation.findByIdAndUpdate(data.targetConversationId, { $set: { deletedBy: [] } });
+          } catch {}
+
+          // Increment unread counters for other participants
+          await this.incrementUnreadForOthers(data.targetConversationId, socket.userId!);
+          
+          // Notify participants about unread counters update
+          this.io.to(data.targetConversationId).emit("unread_counts_updated", {
+            conversationId: data.targetConversationId,
+          });
+
+          // Mark message as delivered to online users
+          await this.markMessageAsDelivered(String(forwardedMessage._id), data.targetConversationId);
+
+          if (ack) ack({ success: true, message: populatedForwardedMessage });
+        } catch (error) {
+          console.error("Forward message error:", error);
+          if (ack) ack({ success: false, error: "Failed to forward message" });
+          socket.emit("forward_error", { error: "Failed to forward message" });
         }
       });
 

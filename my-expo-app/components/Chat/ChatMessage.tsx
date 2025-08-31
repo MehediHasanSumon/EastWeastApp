@@ -122,10 +122,16 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                   {' '}(edited)
                 </Text>
               )}
-            </Text>
-          )}
-          
-          {message.attachments && message.attachments.length > 0 && (
+                             {/* Forward indicator */}
+               {message.isForwarded && (
+                 <Text style={[styles.forwardIndicator, { color: isOwnMessage ? '#FFFFFF' + 'CC' : theme.fontColor + '99' }]}>
+                   {' '}↗️ Forwarded
+                 </Text>
+               )}
+             </Text>
+           )}
+           
+           {message.attachments && message.attachments.length > 0 && (
             <View style={styles.attachmentContainer}>
               {message.attachments.map((attachment, idx) => (
                 <View key={idx} style={[styles.attachmentItem, { backgroundColor: isOwnMessage ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 132, 255, 0.1)' }]}>
@@ -363,6 +369,12 @@ const styles = StyleSheet.create({
     letterSpacing: -0.1,
   },
   editedIndicator: {
+    fontSize: 11,
+    fontStyle: 'italic',
+    opacity: 0.8,
+    fontWeight: '500',
+  },
+  forwardIndicator: {
     fontSize: 11,
     fontStyle: 'italic',
     opacity: 0.8,
