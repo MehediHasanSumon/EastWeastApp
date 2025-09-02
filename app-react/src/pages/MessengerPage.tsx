@@ -76,7 +76,7 @@ const MessengerPage: React.FC = () => {
           try {
             chatSocketService.markConversationAsRead(conversation._id);
           } catch (error) {
-            console.log('Could not mark conversation as read:', error);
+            // Silent fail for read operations
           }
         }
       });
@@ -570,6 +570,7 @@ const MessengerPage: React.FC = () => {
               onLoadOlder={loadOlder}
               hasMoreOlder={hasMoreOlder}
               isLoadingOlder={isLoadingOlder}
+              allConversations={conversations}
             />
           ) : (
             <div className="flex-1 flex items-center justify-center p-8">

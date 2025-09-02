@@ -66,22 +66,77 @@ class ChatApiService {
   // Upload media file
   async uploadMedia(file: any): Promise<{ url: string; fileName: string; fileSize: number }> {
     try {
+      // Create FormData with proper file handling for React Native
       const formData = new FormData();
-      formData.append('file', file);
+      
+      // Ensure the file object has the correct structure for React Native
+      // React Native requires specific properties for file uploads
+      const fileToUpload = {
+        uri: file.uri,
+        type: file.type || 'image/jpeg',
+        name: file.name || `file_${Date.now()}`,
+      };
+      
+      // For React Native, we need to append the file object directly
+      // The FormData.append will handle the proper formatting
+      formData.append('file', fileToUpload as any);
+
+      // Log the FormData contents in development
+      if (__DEV__) {
+        console.log('Uploading file:', {
+          uri: file.uri,
+          type: file.type,
+          name: file.name,
+          size: file.fileSize
+        });
+        console.log('FormData created:', formData);
+      }
 
       const response = await api.post<ChatApiResponse<{ url: string; fileName: string; fileSize: number }>>(
         '/api/chat/media',
         formData,
         {
           headers: {
-            'Content-Type': 'multipart/form-data',
+            // Don't set Content-Type manually - let React Native set it with boundary
+            'Accept': 'application/json',
+          },
+          timeout: 60000, // 60 seconds timeout for file uploads
+          transformRequest: (data, headers) => {
+            // Ensure FormData is not transformed
+            if (data instanceof FormData) {
+              return data;
+            }
+            return data;
           },
         }
       );
       return response.data.data;
     } catch (error: any) {
-      console.error('Failed to upload media:', error);
-      throw new Error(error.response?.data?.message || 'Failed to upload media');
+      // Enhanced error handling with user-friendly messages
+      let errorMessage = 'Failed to upload media';
+      
+      if (error.userMessage) {
+        errorMessage = error.userMessage;
+      } else if (error.response?.status === 413) {
+        errorMessage = 'File too large. Please select a smaller file.';
+      } else if (error.response?.status === 415) {
+        errorMessage = 'Unsupported file type. Please select a valid image or document.';
+      } else if (error.response?.status === 0) {
+        errorMessage = 'Server connection failed. Please check if the server is running.';
+      } else if (error.code === 'ECONNABORTED') {
+        errorMessage = 'Upload timeout. Please try again with a smaller file or better connection.';
+      } else if (error.message?.includes('Network Error')) {
+        errorMessage = 'Network error. Please check your internet connection.';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      
+      // Log error in development only
+      if (__DEV__) {
+        console.error('Failed to upload media:', error);
+      }
+      
+      throw new Error(errorMessage);
     }
   }
 

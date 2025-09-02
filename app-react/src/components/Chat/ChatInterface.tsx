@@ -24,6 +24,7 @@ interface ChatInterfaceProps {
   onLoadOlder?: () => Promise<void>;
   hasMoreOlder?: boolean;
   isLoadingOlder?: boolean;
+  allConversations: IConversation[];
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({
@@ -42,6 +43,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   onLoadOlder,
   hasMoreOlder = false,
   isLoadingOlder = false,
+  allConversations,
 }) => {
   const currentUserId: string | undefined = currentUser?.id || currentUser?._id;
   const [isTyping, setIsTyping] = useState(false);
@@ -314,7 +316,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 onDelete={onMessageDelete}
                 currentUser={currentUser}
                 onReply={(m) => setReplyToMessage(m)}
-                onForward={(m) => { setForwardSource(m); setForwardOpen(true); }}
+                onForward={(m) => { 
+          setForwardSource(m); 
+          setForwardOpen(true); 
+        }}
               />
             </div>
           ))
@@ -394,17 +399,37 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
         isOpen={forwardOpen}
         onClose={() => setForwardOpen(false)}
         message={forwardSource}
-        conversations={(currentUser as any)?.allConversations || []}
+        conversations={allConversations}
         currentConversationId={conversation._id}
         currentUserId={currentUserId}
         onForward={async (targetConversationId, msg) => {
-          // Bubble up via custom DOM event only if parent did not pass handler
-          const handlerExists = typeof window !== 'undefined' && (window as any).__forwardHandlerBound;
-          if (handlerExists) {
-            const event = new CustomEvent("forward_message", { detail: { targetConversationId, message: msg } });
-            window.dispatchEvent(event);
-          } else {
-            // Fallback no-op; parent should own the send
+          try {
+            // Import the socket service dynamically to avoid circular dependencies
+            const chatSocketService = (await import("../../socket/chatSocket")).default;
+            
+            // Check socket connection
+            const isConnected = chatSocketService.getConnectionStatus();
+            
+            if (!isConnected) {
+              chatSocketService.connect();
+            }
+            
+            // Use WebSocket to forward the message
+            await chatSocketService.forwardMessage(
+              msg._id,
+              targetConversationId
+            );
+            
+            // Close the modal
+            setForwardOpen(false);
+            setForwardSource(null);
+            
+            // You can add a toast notification here if you have a toast system
+            // toast.success("Message forwarded successfully");
+            
+          } catch (error) {
+            // You can add error handling here
+            // toast.error("Failed to forward message");
           }
         }}
       />

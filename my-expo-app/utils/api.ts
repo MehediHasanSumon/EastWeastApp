@@ -79,36 +79,43 @@ api.interceptors.request.use(async (config) => {
 // Response interceptor with better error handling
 api.interceptors.response.use(
   (res) => {
-    // Log successful responses in development
+    // Log successful responses in development only
     if (__DEV__) {
       console.log(`✅ API Response [${res.config.method?.toUpperCase()}] ${res.config.url}:`, res.status);
     }
     return res;
   },
   async (error) => {
-    // Log error details
-    if (error.response) {
-      console.error(`❌ API Error [${error.config?.method?.toUpperCase()}] ${error.config?.url}:`, {
-        status: error.response.status,
-        data: error.response.data,
-        headers: error.response.headers,
-      });
-    } else if (error.request) {
-      console.error('❌ API Request Error:', error.request);
-    } else {
-      console.error('❌ API Error:', error.message);
+    // Production-ready error logging
+    if (__DEV__) {
+      if (error.response) {
+        console.error(`❌ API Error [${error.config?.method?.toUpperCase()}] ${error.config?.url}:`, {
+          status: error.response.status,
+          data: error.response.data,
+          headers: error.response.headers,
+        });
+      } else if (error.request) {
+        console.error('❌ API Request Error:', error.request);
+      } else {
+        console.error('❌ API Error:', error.message);
+      }
     }
 
     // Handle specific error cases
     if (error.response?.status === 401) {
-      console.log('🔄 Unauthorized, clearing auth...');
+      if (__DEV__) console.log('🔄 Unauthorized, clearing auth...');
       await clearAuth();
     } else if (error.response?.status === 503) {
-      console.log('⚠️ Service unavailable, database connection issue');
+      if (__DEV__) console.log('⚠️ Service unavailable, database connection issue');
     } else if (error.code === 'ECONNABORTED') {
-      console.log('⏰ Request timeout');
-    } else if (error.code === 'NETWORK_ERROR') {
-      console.log('🌐 Network error, check internet connection');
+      if (__DEV__) console.log('⏰ Request timeout');
+    } else if (error.code === 'NETWORK_ERROR' || error.message?.includes('Network Error')) {
+      if (__DEV__) console.log('🌐 Network error, check internet connection');
+      // Provide user-friendly error message
+      error.userMessage = 'Network error: Please check your internet connection and try again.';
+    } else if (error.response?.status === 0) {
+      if (__DEV__) console.log('🔌 Server connection failed - server may be offline');
+      error.userMessage = 'Unable to connect to server. Please check if the server is running.';
     }
 
     return Promise.reject(error);

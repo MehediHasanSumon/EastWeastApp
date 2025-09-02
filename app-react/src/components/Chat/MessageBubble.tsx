@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ThumbsUp, Heart, Laugh,  Frown, Angry, Smile, Edit3, Trash2, Share2 } from "lucide-react";
+import { Smile, Edit3, Trash2, Share2 } from "lucide-react";
 import type { IMessage } from "../../service/chatService";
 
 interface MessageBubbleProps {
@@ -34,7 +34,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
 
   const getDisplayName = () => message.fileName || message.content || "file";
 
-  const buildDownloadUrl = (url?: string, filename?: string) => {
+  const buildDownloadUrl = (url?: string) => {
     if (!url) return undefined;
     // If Cloudinary URL, add fl_attachment to force download
     try {
@@ -93,31 +93,31 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
     }
 
     switch (message.messageType) {
-      case "image":
-        return (
-          <div>
-            <img
-              src={message.mediaUrl}
-              alt="Shared image"
-              className="max-w-xs rounded-xl cursor-pointer hover:scale-105 transition-transform duration-200 shadow-lg"
-              onClick={() => window.open(message.mediaUrl, "_blank")}
-            />
-            <div className="mt-3 flex items-center space-x-3">
-              {message.content && <p className="text-sm text-gray-600 dark:text-gray-300">{message.content}</p>}
-              {message.mediaUrl && (
-                <a
-                  href={buildDownloadUrl(message.mediaUrl, getDisplayName())}
-                  download={getDisplayName()}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-sm text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 hover:underline transition-colors"
-                >
-                  Download
-                </a>
-              )}
+              case "image":
+          return (
+            <div>
+              <img
+                src={message.mediaUrl}
+                alt="Shared image"
+                className="max-w-xs rounded-xl cursor-pointer hover:scale-105 transition-transform duration-200 shadow-lg"
+                onClick={() => window.open(message.mediaUrl, "_blank")}
+              />
+              <div className="mt-3 flex items-center space-x-3">
+                {message.content && <p className="text-sm text-gray-600 dark:text-gray-300">{message.content}</p>}
+                {message.mediaUrl && (
+                  <a
+                    href={buildDownloadUrl(message.mediaUrl)}
+                    download={getDisplayName()}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 hover:underline transition-colors"
+                  >
+                    Download
+                  </a>
+                )}
+              </div>
             </div>
-          </div>
-        );
+          );
       case "file":
         // If backend marked as file but URL is an image, render as image for better UX
         if (isImageUrl(message.mediaUrl)) {
@@ -133,7 +133,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
                 {message.content && <p className="text-sm text-gray-600 dark:text-gray-300">{message.content}</p>}
                 {message.mediaUrl && (
                   <a
-                    href={buildDownloadUrl(message.mediaUrl, getDisplayName())}
+                    href={buildDownloadUrl(message.mediaUrl)}
                     download={getDisplayName()}
                     target="_blank"
                     rel="noreferrer"
@@ -151,7 +151,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
             <div className="text-2xl">📎</div>
             <div>
               <a
-                href={buildDownloadUrl(message.mediaUrl, getDisplayName())}
+                href={buildDownloadUrl(message.mediaUrl)}
                 download={getDisplayName()}
                 target="_blank"
                 rel="noreferrer"
@@ -179,7 +179,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
             ) : null}
             {message.mediaUrl && (
               <a
-                href={buildDownloadUrl(message.mediaUrl, getDisplayName())}
+                href={buildDownloadUrl(message.mediaUrl)}
                 download={getDisplayName()}
                 target="_blank"
                 rel="noreferrer"
@@ -198,7 +198,7 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
               {message.content && <p className="text-sm text-gray-600 dark:text-gray-300">{message.content}</p>}
               {message.mediaUrl && (
                 <a
-                  href={buildDownloadUrl(message.mediaUrl, getDisplayName())}
+                  href={buildDownloadUrl(message.mediaUrl)}
                   download={getDisplayName()}
                   target="_blank"
                   rel="noreferrer"
@@ -289,6 +289,14 @@ const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, on
           {message.isEdited && (
             <div className="text-xs opacity-70 mt-2 italic">
               (edited)
+            </div>
+          )}
+
+          {/* Forward indicator */}
+          {message.isForwarded && (
+            <div className="text-xs opacity-70 mt-2 italic flex items-center gap-1">
+              <span>↗️</span>
+              <span>Forwarded</span>
             </div>
           )}
 

@@ -18,6 +18,7 @@ interface ChatInputProps {
   onMessageChange: (text: string) => void;
   onSendMessage: () => void;
   onImagePicker: () => void;
+  onCameraCapture: () => void;
   onDocumentPicker: () => void;
   isSending: boolean;
   inputHeightAnim: Animated.Value;
@@ -31,6 +32,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
   onMessageChange,
   onSendMessage,
   onImagePicker,
+  onCameraCapture,
   onDocumentPicker,
   isSending,
   inputHeightAnim,
@@ -78,9 +80,16 @@ const ChatInput: React.FC<ChatInputProps> = ({
           
           <TouchableOpacity 
             style={[styles.actionButton, { backgroundColor: theme.mode === 'dark' ? '#3A3B3C' : '#F0F2F5' }]} 
-            onPress={onImagePicker}
+            onPress={onCameraCapture}
           >
             <Ionicons name="camera" size={20} color="#0084FF" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={[styles.actionButton, { backgroundColor: theme.mode === 'dark' ? '#3A3B3C' : '#F0F2F5' }]} 
+            onPress={onImagePicker}
+          >
+            <Ionicons name="images" size={20} color="#0084FF" />
           </TouchableOpacity>
         </View>
         

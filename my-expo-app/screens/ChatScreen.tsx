@@ -15,6 +15,7 @@ import { useAppDispatch, useAppSelector } from '../store';
 import { fetchMessages, sendMessage, addMessage, setTypingUser, addMessageReaction, removeMessageReaction, removeMessage, deleteMessage } from '../store/chatSlice';
 import { chatSocketService } from '../utils/chatSocket';
 import { ChatMessage, SocketMessage, ChatUser } from '../types/chat';
+import { chatApiService } from '../utils/chatApi';
 
 // Map emojis to backend reaction types
 const REACTION_EMOJIS = [
@@ -200,7 +201,7 @@ const ChatScreen: React.FC = () => {
            // Listen for message deletion
       chatSocketService.on('message_deleted', (data: any) => {
         try {
-          console.log('🗑️ Received message_deleted event:', data);
+          if (__DEV__) console.log('🗑️ Received message_deleted event:', data);
           const { messageId } = data;
           
           if (currentConversation) {
@@ -219,7 +220,7 @@ const ChatScreen: React.FC = () => {
          // Listen for message reactions
      chatSocketService.on('message_reaction', (data: any) => {
        try {
-         console.log('🔔 Received message_reaction event:', data);
+         if (__DEV__) console.log('🔔 Received message_reaction event:', data);
          
          if (!data || typeof data !== 'object') {
            console.error('❌ Invalid message_reaction data - not an object:', data);
@@ -235,7 +236,7 @@ const ChatScreen: React.FC = () => {
          
          if (currentConversation) {
            if (reactionType === 'remove') {
-             console.log('🗑️ Removing reaction for message:', messageId);
+             if (__DEV__) console.log('🗑️ Removing reaction for message:', messageId);
              // Remove reaction
              dispatch(removeMessageReaction({
                messageId,
@@ -243,7 +244,7 @@ const ChatScreen: React.FC = () => {
                conversationId: currentConversation._id,
              }));
            } else {
-             console.log('➕ Adding reaction for message:', messageId, 'emoji:', emoji);
+             if (__DEV__) console.log('➕ Adding reaction for message:', messageId, 'emoji:', emoji);
              // Add reaction
              dispatch(addMessageReaction({
                messageId,
@@ -375,18 +376,162 @@ Animated.sequence([
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
-        quality: 0.8,
+        allowsEditing: false, // No cropping - keep original dimensions
+        quality: 0.9, // Higher quality for better image preservation
+        allowsMultipleSelection: false, // Single image selection
+        exif: false, // Don't include EXIF data for privacy
       });
 
       if (!result.canceled && result.assets[0]) {
-        // Handle image upload and send
-        console.log('Image selected:', result.assets[0]);
-        // TODO: Implement image upload and sending
+        const selectedAsset = result.assets[0];
+        if (__DEV__) console.log('Image selected (no crop):', selectedAsset);
+        
+        // Show loading state
+        setIsSending(true);
+        
+        try {
+          // Determine file type based on asset
+          const fileType = selectedAsset.type || 'image/jpeg';
+          const fileExtension = fileType.includes('jpeg') ? 'jpg' : 
+                               fileType.includes('png') ? 'png' : 
+                               fileType.includes('gif') ? 'gif' : 'jpg';
+          
+          // Create file object for upload with proper structure
+          const file = {
+            uri: selectedAsset.uri,
+            type: fileType,
+            name: `image_${Date.now()}.${fileExtension}`,
+            fileSize: selectedAsset.fileSize || 0,
+          };
+          
+          if (__DEV__) {
+            console.log('Prepared file for upload:', file);
+          }
+          
+          // Upload the image
+          const uploadResult = await chatApiService.uploadMedia(file);
+          if (__DEV__) console.log('Image uploaded:', uploadResult);
+          
+          // Send the image message
+          if (currentConversation) {
+            const imageMessage: SocketMessage = {
+              conversationId: currentConversation._id,
+              content: '', // Optional caption
+              messageType: 'image',
+              mediaUrl: uploadResult.url,
+              fileName: uploadResult.fileName,
+              fileSize: uploadResult.fileSize,
+            };
+            
+            // Send via WebSocket
+            chatSocketService.sendMessage(imageMessage);
+            
+            // Show success toast
+            showToast('Image sent successfully (no crop)', 'success', 3000);
+          }
+        } catch (uploadError: any) {
+          if (__DEV__) console.error('Failed to upload image:', uploadError);
+          
+          // Provide more specific error messages
+          let errorMessage = 'Failed to upload image';
+          if (uploadError.message) {
+            errorMessage = uploadError.message;
+          } else if (uploadError.response?.data?.message) {
+            errorMessage = uploadError.response.data.message;
+          }
+          
+          showToast(errorMessage, 'error', 5000);
+        } finally {
+          setIsSending(false);
+        }
       }
     } catch (error) {
+      console.error('Image picker error:', error);
       Alert.alert('Error', 'Failed to pick image');
+    }
+  };
+
+  const handleCameraCapture = async () => {
+    try {
+      // Request camera permissions
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        showToast('Camera permission is required to take photos', 'error', 5000);
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false, // No cropping - keep original dimensions
+        quality: 0.9, // Higher quality for better image preservation
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        const capturedAsset = result.assets[0];
+        if (__DEV__) console.log('Photo captured (no crop):', capturedAsset);
+        
+        // Show loading state
+        setIsSending(true);
+        
+        try {
+          // Determine file type based on asset
+          const fileType = capturedAsset.type || 'image/jpeg';
+          const fileExtension = fileType.includes('jpeg') ? 'jpg' : 
+                               fileType.includes('png') ? 'png' : 
+                               fileType.includes('gif') ? 'gif' : 'jpg';
+          
+          // Create file object for upload with proper structure
+          const file = {
+            uri: capturedAsset.uri,
+            type: fileType,
+            name: `photo_${Date.now()}.${fileExtension}`,
+            fileSize: capturedAsset.fileSize || 0,
+          };
+          
+          if (__DEV__) {
+            console.log('Prepared photo for upload:', file);
+          }
+          
+          // Upload the captured photo
+          const uploadResult = await chatApiService.uploadMedia(file);
+          if (__DEV__) console.log('Photo uploaded:', uploadResult);
+          
+          // Send the photo message
+          if (currentConversation) {
+            const photoMessage: SocketMessage = {
+              conversationId: currentConversation._id,
+              content: '', // Optional caption
+              messageType: 'image',
+              mediaUrl: uploadResult.url,
+              fileName: uploadResult.fileName,
+              fileSize: uploadResult.fileSize,
+            };
+            
+            // Send via WebSocket
+            chatSocketService.sendMessage(photoMessage);
+            
+            // Show success toast
+            showToast('Photo captured and sent successfully (no crop)', 'success', 3000);
+          }
+        } catch (uploadError: any) {
+          if (__DEV__) console.error('Failed to upload photo:', uploadError);
+          
+          // Provide more specific error messages
+          let errorMessage = 'Failed to upload photo';
+          if (uploadError.message) {
+            errorMessage = uploadError.message;
+          } else if (uploadError.response?.data?.message) {
+            errorMessage = uploadError.response.data.message;
+          }
+          
+          showToast(errorMessage, 'error', 5000);
+        } finally {
+          setIsSending(false);
+        }
+      }
+    } catch (error: any) {
+      if (__DEV__) console.error('Camera capture error:', error);
+      showToast('Failed to capture photo. Please try again.', 'error', 3000);
     }
   };
 
@@ -398,11 +543,64 @@ Animated.sequence([
       });
 
       if (!result.canceled && result.assets[0]) {
-        // Handle document upload and send
-        console.log('Document selected:', result.assets[0]);
-        // TODO: Implement document upload and sending
+        const selectedAsset = result.assets[0];
+        if (__DEV__) console.log('Document selected:', selectedAsset);
+        
+        // Show loading state
+        setIsSending(true);
+        
+        try {
+          // Create file object for upload with proper structure
+          const file = {
+            uri: selectedAsset.uri,
+            type: selectedAsset.mimeType || 'application/octet-stream',
+            name: selectedAsset.name || `document_${Date.now()}`,
+            fileSize: selectedAsset.size || 0,
+          };
+          
+          if (__DEV__) {
+            console.log('Prepared document for upload:', file);
+          }
+          
+          // Upload the document
+          const uploadResult = await chatApiService.uploadMedia(file);
+          if (__DEV__) console.log('Document uploaded:', uploadResult);
+          
+          // Send the document message
+          if (currentConversation) {
+            const documentMessage: SocketMessage = {
+              conversationId: currentConversation._id,
+              content: '', // Optional caption
+              messageType: 'file',
+              mediaUrl: uploadResult.url,
+              fileName: uploadResult.fileName,
+              fileSize: uploadResult.fileSize,
+            };
+            
+            // Send via WebSocket
+            chatSocketService.sendMessage(documentMessage);
+            
+            // Show success toast
+            showToast('Document sent successfully', 'success', 3000);
+          }
+        } catch (uploadError: any) {
+          if (__DEV__) console.error('Failed to upload document:', uploadError);
+          
+          // Provide more specific error messages
+          let errorMessage = 'Failed to upload document';
+          if (uploadError.message) {
+            errorMessage = uploadError.message;
+          } else if (uploadError.response?.data?.message) {
+            errorMessage = uploadError.response.data.message;
+          }
+          
+          showToast(errorMessage, 'error', 5000);
+        } finally {
+          setIsSending(false);
+        }
       }
     } catch (error) {
+      console.error('Document picker error:', error);
       Alert.alert('Error', 'Failed to pick document');
     }
   };
@@ -423,7 +621,7 @@ Animated.sequence([
   const handleMessageEdit = (newContent: string) => {
     if (selectedMessage) {
       // TODO: Implement edit logic with socket
-      console.log('Edit message:', selectedMessage._id, 'to:', newContent);
+             if (__DEV__) console.log('Edit message:', selectedMessage._id, 'to:', newContent);
       // chatSocketService.editMessage(selectedMessage._id, newContent);
     }
   };
@@ -431,7 +629,7 @@ Animated.sequence([
   const handleMessageDelete = (deleteForEveryone: boolean) => {
     if (selectedMessage && currentConversation) {
       try {
-        console.log('🗑️ Deleting message:', selectedMessage._id, 'for everyone:', deleteForEveryone);
+        if (__DEV__) console.log('🗑️ Deleting message:', selectedMessage._id, 'for everyone:', deleteForEveryone);
         
         // Call the socket service to delete the message (backend only supports soft delete)
         chatSocketService.deleteMessage(selectedMessage._id);
@@ -459,7 +657,7 @@ Animated.sequence([
 
   const handleMessageReply = () => {
     if (selectedMessage) {
-      console.log('Reply to message:', selectedMessage._id);
+             if (__DEV__) console.log('Reply to message:', selectedMessage._id);
       setReplyToMessage(selectedMessage);
       setShowMessageActions(false);
       setSelectedMessage(null);
@@ -472,7 +670,7 @@ Animated.sequence([
 
   const handleMessageForward = () => {
     if (selectedMessage) {
-      console.log('Forward message:', selectedMessage._id);
+             if (__DEV__) console.log('Forward message:', selectedMessage._id);
       setForwardMessage(selectedMessage);
       setShowForwardModal(true);
       setShowMessageActions(false);
@@ -504,7 +702,7 @@ Animated.sequence([
       // Navigate to the target conversation if it's different
       if (targetConversationId !== currentConversation._id) {
         // You can implement navigation to the target conversation here
-        console.log('Forwarded to conversation:', targetConversationId);
+        if (__DEV__) console.log('Forwarded to conversation:', targetConversationId);
       }
     } catch (error: any) {
       console.error('❌ Error forwarding message:', error);
@@ -536,7 +734,7 @@ Animated.sequence([
     
     if (hasReacted) {
       // Remove reaction
-      console.log('🗑️ Removing reaction for message:', targetMessageId);
+             if (__DEV__) console.log('🗑️ Removing reaction for message:', targetMessageId);
       chatSocketService.reactToMessage(targetMessageId, { type: 'remove', emoji });
       dispatch(removeMessageReaction({
         messageId: targetMessageId,
@@ -547,7 +745,7 @@ Animated.sequence([
       // Find the reaction type for this emoji
       const reactionItem = REACTION_EMOJIS.find(item => item.emoji === emoji);
       if (reactionItem) {
-        console.log('➕ Adding reaction for message:', targetMessageId, 'emoji:', emoji);
+        if (__DEV__) console.log('➕ Adding reaction for message:', targetMessageId, 'emoji:', emoji);
         chatSocketService.reactToMessage(targetMessageId, { type: reactionItem.type, emoji });
         dispatch(addMessageReaction({
           messageId: targetMessageId,
@@ -566,7 +764,7 @@ Animated.sequence([
 
   const handleReactionLongPress = (emoji: string) => {
     // Show reaction details
-    console.log('Show reaction details for:', emoji);
+           if (__DEV__) console.log('Show reaction details for:', emoji);
   };
 
   const openReactionPicker = (messageId: string) => {
@@ -660,6 +858,7 @@ Animated.sequence([
          onMessageChange={handleTyping}
          onSendMessage={handleSendMessage}
          onImagePicker={handleImagePicker}
+         onCameraCapture={handleCameraCapture}
          onDocumentPicker={handleDocumentPicker}
          isSending={isSending}
          inputHeightAnim={inputHeightAnim}

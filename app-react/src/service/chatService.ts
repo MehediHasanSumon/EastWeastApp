@@ -27,6 +27,9 @@ export interface IMessage {
   fileSize?: number;
   duration?: number;
   replyTo?: IMessage;
+  isForwarded?: boolean;
+  originalMessageId?: string;
+  originalSenderId?: string;
   reactions: {
     [userId: string]: {
       type: string;

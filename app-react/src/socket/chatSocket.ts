@@ -1,11 +1,10 @@
-import { io, Socket } from "socket.io-client";
+import io from "socket.io-client";
 import { getCookie } from "../utils/Storage";
 import { hexToString } from "../utils/Lib";
 
 class ChatSocketService {
-  private socket: Socket | null = null;
+  private socket: any | null = null;
   private isConnected = false;
-  private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
   private reconnectDelay = 1000;
   // Queue read events to avoid errors when offline
@@ -24,7 +23,6 @@ class ChatSocketService {
     const authToken = hexToString(token as string);
 
     if (!authToken) {
-      console.error("No authentication token found");
       return;
     }
 
@@ -51,9 +49,7 @@ class ChatSocketService {
     if (!this.socket) return;
 
     this.socket.on("connect", () => {
-      console.log("Connected to chat server");
       this.isConnected = true;
-      this.reconnectAttempts = 0;
       this.emit("socket_connected");
       
       // Set user online immediately when connected
@@ -77,67 +73,65 @@ class ChatSocketService {
     });
 
     this.socket.on("disconnect", () => {
-      console.log("Disconnected from chat server");
       this.isConnected = false;
       this.emit("socket_disconnected");
     });
 
-    this.socket.on("connect_error", (error) => {
-      // Let Socket.IO built-in reconnection handle retry; keep console noise minimal
-      console.debug("Socket connect_error", error?.message || error);
+    this.socket.on("connect_error", () => {
+      // Let Socket.IO built-in reconnection handle retry
     });
 
     // Chat events
-    this.socket.on("new_message", (message) => {
+    this.socket.on("new_message", (message: any) => {
       this.emit("new_message", message);
     });
 
-    this.socket.on("message_edited", (data) => {
+    this.socket.on("message_edited", (data: any) => {
       this.emit("message_edited", data);
     });
 
-    this.socket.on("message_deleted", (data) => {
+    this.socket.on("message_deleted", (data: any) => {
       this.emit("message_deleted", data);
     });
 
-    this.socket.on("message_reaction", (data) => {
+    this.socket.on("message_reaction", (data: any) => {
       this.emit("message_reaction", data);
     });
 
-    this.socket.on("typing_start", (data) => {
+    this.socket.on("typing_start", (data: any) => {
       this.emit("typing_start", data);
     });
 
-    this.socket.on("typing_stop", (data) => {
+    this.socket.on("typing_stop", (data: any) => {
       this.emit("typing_stop", data);
     });
 
-    this.socket.on("user_presence", (data) => {
+    this.socket.on("user_presence", (data: any) => {
       this.emit("user_presence", data);
     });
 
     // Unread counters updated
-    this.socket.on("unread_counts_updated", (data) => {
+    this.socket.on("unread_counts_updated", (data: any) => {
       this.emit("unread_counts_updated", data);
     });
 
     // Error events
-    this.socket.on("message_error", (error) => {
+    this.socket.on("message_error", (error: any) => {
       this.emit("message_error", error);
     });
 
-    this.socket.on("reaction_error", (error) => {
+    this.socket.on("reaction_error", (error: any) => {
       this.emit("reaction_error", error);
     });
 
-    this.socket.on("edit_error", (error) => {
+    this.socket.on("edit_error", (error: any) => {
       this.emit("edit_error", error);
     });
 
-    this.socket.on("delete_error", (error) => {
+    this.socket.on("delete_error", (error: any) => {
       this.emit("delete_error", error);
     });
-    this.socket.on("read_error", (error) => {
+    this.socket.on("read_error", (error: any) => {
       this.emit("read_error", error);
     });
 
@@ -145,11 +139,11 @@ class ChatSocketService {
     this.setupVisibilityListener();
 
     // WebRTC signaling events
-    this.socket.on("call_invite", (data) => this.emit("call_invite", data));
-    this.socket.on("call_cancelled", (data) => this.emit("call_cancelled", data));
-    this.socket.on("call_accepted", (data) => this.emit("call_accepted", data));
-    this.socket.on("call_rejected", (data) => this.emit("call_rejected", data));
-    this.socket.on("webrtc_signal", (data) => this.emit("webrtc_signal", data));
+    this.socket.on("call_invite", (data: any) => this.emit("call_invite", data));
+    this.socket.on("call_cancelled", (data: any) => this.emit("call_cancelled", data));
+    this.socket.on("call_accepted", (data: any) => this.emit("call_accepted", data));
+    this.socket.on("call_rejected", (data: any) => this.emit("call_rejected", data));
+    this.socket.on("webrtc_signal", (data: any) => this.emit("webrtc_signal", data));
   }
 
   // Removed manual reconnect; rely on Socket.IO built-in reconnection
@@ -333,6 +327,27 @@ class ChatSocketService {
   // Get connection status
   getConnectionStatus() {
     return this.isConnected;
+  }
+
+  // Forward message to another conversation
+  forwardMessage(messageId: string, targetConversationId: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      if (!this.socket || !this.isConnected) {
+        reject(new Error("Socket not connected"));
+        return;
+      }
+
+      this.socket.emit("forward_message", {
+        messageId,
+        targetConversationId,
+      }, (response: any) => {
+        if (response.success) {
+          resolve(response.message);
+        } else {
+          reject(new Error(response.error || "Failed to forward message"));
+        }
+      });
+    });
   }
 
   // --- WebRTC signaling API ---
